@@ -1,0 +1,32 @@
+# Virtual environment
+venv/
+ENV/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Windows-specific files
+Thumbs.db
+
+# macOS-specific files
+.DS_Store
+
+# IDE and Editor directories
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Ignore any temporary files if needed
+*.tmp
+
+# If you have any local configuration files, you might exclude them too.
