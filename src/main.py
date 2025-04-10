@@ -4,8 +4,10 @@ import sys
 import xlwings as xw
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from tkinterdnd2 import DND_FILES, TkinterDnD
 import shutil
 import uuid
+
 
 # Import the converter classes.
 from converters.ulc_coverpage import ULCCoverpageConverter
@@ -17,6 +19,7 @@ from converters.elu_only import EluOnlyConverter
 from converters.ulc_c2 import ULCC2Converter
 from converters.field_device_testing import FieldDeviceTestingConverter
 from converters.base import DefaultConverter
+
 
 # List of expected sheet names exactly as they appear.
 EXPECTED_SHEETS = [
@@ -158,19 +161,57 @@ def select_file_and_convert():
             messagebox.showinfo("Conversion Complete", f"Converted file saved at:\n{output_file}")
             os.startfile(output_file)
 
-def main():
-    global root
-    root = tk.Tk()
-    root.title("Report Converter")
-    root.geometry("400x150")
+def handle_drop(event):
+    filepath = event.data.strip("{}")  # Remove {} from file path if present
+    if filepath.lower().endswith(".xlsx"):
+        drop_zone.config(bg="#d4edda", fg="#155724", text="✅ Valid file received, processing...")
+        root.update_idletasks()
 
-    label = tk.Label(root, text="Select an Excel file to convert:")
+        found_sheets = detect_expected_sheets(filepath)
+        if not found_sheets:
+            drop_zone.config(bg="#fff3cd", fg="#856404", text="⚠️ No expected sheets found")
+            messagebox.showerror("Error", "No expected sheets found in the selected file.")
+            return
+
+        confirmed_sheets = confirm_sheets_dialog(found_sheets, root)
+        if not confirmed_sheets:
+            drop_zone.config(bg="#f0f0f0", fg="#333", text="⬇️ Drop Excel file here ⬇️")
+            messagebox.showinfo("Info", "No sheets selected for conversion.")
+            return
+
+        output_file = convert_report(filepath, confirmed_sheets)
+        if output_file:
+            drop_zone.config(bg="#d1ecf1", fg="#0c5460", text="✅ Conversion complete!")
+            messagebox.showinfo("Conversion Complete", f"Converted file saved at:\n{output_file}")
+            os.startfile(output_file)
+    else:
+        drop_zone.config(bg="#f8d7da", fg="#721c24", text="❌ Invalid file type. Drop a .xlsx file.")
+        messagebox.showwarning("Invalid File", "Please drop a valid .xlsx file.")
+
+
+def main():
+    global root, drop_zone
+    root = TkinterDnD.Tk()
+    root.title("Report Converter")
+    root.geometry("400x220")
+
+    label = tk.Label(root, text="Select or drop an Excel file to convert:")
     label.pack(pady=10)
 
+    drop_zone = tk.Label(root, text="⬇️ Drop Excel file here ⬇️", relief="ridge", borderwidth=2,
+                         width=40, height=4, bg="#f0f0f0", fg="#333")
+    drop_zone.pack(pady=10)
+    drop_zone.drop_target_register(DND_FILES)
+    drop_zone.dnd_bind("<<Drop>>", handle_drop)
+
     convert_button = tk.Button(root, text="Browse and Convert", command=select_file_and_convert, padx=10, pady=5)
-    convert_button.pack()
+    convert_button.pack(pady=10)
 
     root.mainloop()
+
+
+    root.mainloop()
+
 
 if __name__ == "__main__":
     main()
