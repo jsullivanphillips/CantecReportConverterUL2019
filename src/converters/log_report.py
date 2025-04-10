@@ -119,7 +119,7 @@ class LogReportConverter(BaseSheetConverter):
             # check for failures
             operation_confirmed = "✖" if row_data[3] == 5 else ""
             annunciation_confirmed = "✖" if row_data[4] == 5 else ""
-            installed_correctly = "✖" if row_data[12] == 5 else ""
+            installed_correctly = "N" if row_data[12] == 5 else ""
 
 
             col_A.append(device_location)
