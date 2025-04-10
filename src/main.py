@@ -238,7 +238,12 @@ def handle_drop(event):
             convert_button.config(state="normal")  # 👈 Re-enable on cancel
             return
 
-        output_file = convert_report(filepath, confirmed_sheets, progress_callback=update_progress)
+        output_file = convert_report(
+            filepath,
+            confirmed_sheets,
+            progress_callback=update_progress,
+            save_to_input_dir=bool(save_in_same_dir_var.get())
+        )
         if output_file:
             drop_zone.config(bg="#d1ecf1", fg="#0c5460", text="✅ Conversion complete!")
             messagebox.showinfo("Conversion Complete", f"Converted file saved at:\n{output_file}")
