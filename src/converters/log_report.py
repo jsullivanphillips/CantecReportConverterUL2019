@@ -161,8 +161,14 @@ class LogReportConverter(BaseSheetConverter):
         output_sheet.range(f"M{start_output_row}:M{end_row}").value = [[v] for v in col_M]
 
         output_sheet.range(f"G{start_output_row}:G{end_row}").value = self.clean_column(col_G)
-        output_sheet.range(f"I{start_output_row}:I{end_row}").value = self.clean_column(col_I)
-        output_sheet.range(f"J{start_output_row}:J{end_row}").value = self.clean_column(col_J)
+        
+        for i, (op_confirmed, ann_confirmed) in enumerate(zip(col_I, col_J)):
+            row = start_output_row + i
+            if op_confirmed:  # only write if not empty
+                output_sheet.range(f"I{row}").value = op_confirmed
+            if ann_confirmed:
+                output_sheet.range(f"J{row}").value = ann_confirmed
+
 
         # Step 4: Apply bold formatting only where needed
         for i, is_bold in enumerate(bold_mask):
