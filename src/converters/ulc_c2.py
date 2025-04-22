@@ -8,6 +8,7 @@ put_to_output_cell(self, sheet_index_or_name, cell, value):
 """
 class ULCC2Converter(BaseSheetConverter):
     def convert(self):
+        print("ULC CONVERTER RUNNING")
         # region 22 | CU or Transp Insp
         # Input in relation to connected field devices
         self.transfer_checkbox_rating('A49', "22.1 | CU or Transp Insp", 17)
@@ -46,6 +47,7 @@ class ULCC2Converter(BaseSheetConverter):
         # region 22.2 | CU or Transp Test
         # Power 'ON' visual indicator operates.
         self.transfer_checkbox_rating('A7', "22.2 | CU or Transp Test", 9, col_yes='L', col_no='N', col_na='P')
+        print(f"ULC Power on is equal to {self.get_checkbox_value("A7")}, putton on output")
 
         # (8 - 15) : (11 - 18)
         for i, input_row in enumerate(range(8, 16), start=11):

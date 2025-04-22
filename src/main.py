@@ -125,17 +125,17 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
 
         # Process each confirmed sheet
         total = len(sheets_to_convert)
-        print(f"number of sheets to convert: {total}")
+       
         for idx, sheet_name in enumerate(sheets_to_convert, start=1):
-            print(f"idx: {idx}")        
+                  
             input_sheet = input_wb.sheets[sheet_name]
-            print(f"{sheet_name} sheet retrieved")
-            converter_class = CONVERTER_MAPPING.get(sheet_name, DefaultConverter)
-            print(f"{converter_class} class has been grabbed from mapping")
+            
+            converter_class = CONVERTER_MAPPING.get(sheet_name.strip(), DefaultConverter)
+            
             converter = converter_class(input_sheet, template_wb)
-            print(f"{converter} has been instantiated with template_wb")
+            
             converter.convert()
-            print(f"Converted sheet: {sheet_name}")
+            print(f"{sheet_name} converted")
 
             if progress_callback:
                 progress_callback(sheet_name, idx, total)
@@ -161,20 +161,34 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
             os.remove(output_filepath)
         
         time.sleep(0.5)
+
         try:
-            template_wb.save(output_filepath)
+            print("saving template_output")
+            template_wb.save()
         except Exception as save_error:
-            messagebox.showerror("Save Error", f"Failed to save output file:\n{save_error}")
+            messagebox.showerror("Save Error", f"Failed to save template:\n{save_error}")
             raise
 
-        # Clean up
+        time.sleep(1)
+    
+        
+        # === Step 2: Close workbooks ===
         input_wb.close()
         template_wb.close()
         app.quit()
 
-        # Optionally delete the temporary copy now that it's saved
-        os.remove(temp_template_path)
+        time.sleep(1)
 
+        try:
+            if os.path.exists(output_filepath):
+                os.remove(output_filepath)
+            shutil.move(temp_template_path, output_filepath)
+            print(f"Moved to final location: {output_filepath}")
+        except Exception as move_error:
+            messagebox.showerror("Move Error", f"Failed to move saved file:\n{move_error}")
+            raise
+
+        
         return output_filepath
 
     except Exception as e:
