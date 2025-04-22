@@ -26,7 +26,6 @@ from converters.base import DefaultConverter
 
 # List of expected sheet names exactly as they appear.
 EXPECTED_SHEETS = [
-    "ULC Coverpage",
     "DEFICIENCY SUMMARY",
     "APPENDIX C1+C2.13 2.14 2.15",
     "LOG REPORT C3.2- Device Record",
@@ -69,7 +68,7 @@ def detect_expected_sheets(input_filepath):
     try:
         app = xw.App(visible=False)
         wb = app.books.open(input_filepath)
-        found = [sheet.name for sheet in wb.sheets if sheet.name in EXPECTED_SHEETS]
+        found = [sheet.name for sheet in wb.sheets if sheet.name.strip() in EXPECTED_SHEETS]
         wb.close()
         app.quit()
         return found
@@ -114,19 +113,27 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
 
         # Launch Excel
         app = xw.App(visible=False)
+        print(f"xwings has opened")
         time.sleep(0.5)
         app.api.ScreenUpdating = False
         app.api.DisplayAlerts = False
 
         input_wb = xw.Book(input_filepath, update_links=False)
+        print(f"{input_filepath} has been opened with xlwings")
         template_wb = xw.Book(temp_template_path, update_links=False)
+        print(f"{template_wb} has been opened with xlwings")
 
         # Process each confirmed sheet
         total = len(sheets_to_convert)
+        print(f"number of sheets to convert: {total}")
         for idx, sheet_name in enumerate(sheets_to_convert, start=1):
+            print(f"idx: {idx}")        
             input_sheet = input_wb.sheets[sheet_name]
+            print(f"{sheet_name} sheet retrieved")
             converter_class = CONVERTER_MAPPING.get(sheet_name, DefaultConverter)
+            print(f"{converter_class} class has been grabbed from mapping")
             converter = converter_class(input_sheet, template_wb)
+            print(f"{converter} has been instantiated with template_wb")
             converter.convert()
             print(f"Converted sheet: {sheet_name}")
 

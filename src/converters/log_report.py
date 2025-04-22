@@ -41,11 +41,12 @@ class LogReportConverter(BaseSheetConverter):
 
 
         # region To 22.1 | CU or Transp Insp
-        fap_location = self.get_from_input_cell('H5')
-        self.put_to_output_cell("22.1 | CU or Transp Insp", 'H15', fap_location)
-
         fap_make = self.get_from_input_cell('H3')
         fap_model = self.get_from_input_cell('H4')
+
+        fap_make = str(fap_make) if fap_make is not None else ""
+        fap_model = str(fap_model) if fap_model is not None else ""
+
         fap_identification = fap_make + " " + fap_model
         self.put_to_output_cell("22.1 | CU or Transp Insp", 'H16', fap_identification)
         # endregion
@@ -85,7 +86,7 @@ class LogReportConverter(BaseSheetConverter):
         start_output_row = 14
         max_input_rows = len(input_data)
 
-        col_A, col_C, col_D, col_E, col_G, col_I, col_J, col_M, bold_mask = [], [], [], [], [], [], [], [], []
+        col_A, col_C, col_D, col_E, col_G, col_I, col_J, col_F, col_M, bold_mask = [], [], [], [], [], [], [], [], [], []
 
         number_of_consecutive_empty_rows = 0
         last_written_row = start_output_row - 1
@@ -121,11 +122,24 @@ class LogReportConverter(BaseSheetConverter):
             annunciation_confirmed = "✖" if row_data[4] == 5 else ""
             installed_correctly = "N" if row_data[12] == 5 else ""
 
+            loop = row_data[7]
+            device = row_data[8]
+
+            loop_str = str(int(loop)) if loop is not None else ""
+            device_str = str(device).zfill(3) if device is not None else ""
+
+            if loop_str and device_str:
+                device_address_and_loop = f"Loop {loop_str}, {device_str}"
+            else:
+                device_address_and_loop = ""
+
+
 
             col_A.append(device_location)
             col_C.append(row_data[2])   # From D
             col_D.append(row_data[13])  # From O
-            col_E.append(row_data[6])   # From H
+            col_E.append(device_address_and_loop)   # From I + J -> Circuit number or device address
+            col_F.append(row_data[6])   # From H -> Annunciated Fire ZONE
             col_G.append(installed_correctly)
             col_I.append(operation_confirmed)
             col_J.append(annunciation_confirmed)
@@ -142,6 +156,7 @@ class LogReportConverter(BaseSheetConverter):
         output_sheet.range(f"A{start_output_row}:A{end_row}").value = [[v] for v in col_A]
         output_sheet.range(f"C{start_output_row}:C{end_row}").value = [[v] for v in col_C]
         output_sheet.range(f"E{start_output_row}:E{end_row}").value = [[v] for v in col_E]
+        output_sheet.range(f"F{start_output_row}:F{end_row}").value = [[v] for v in col_F]
         output_sheet.range(f"D{start_output_row}:D{end_row}").value = [[v] for v in col_D]
         output_sheet.range(f"M{start_output_row}:M{end_row}").value = [[v] for v in col_M]
 
