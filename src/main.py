@@ -21,6 +21,7 @@ from converters.ext_only import ExtOnlyConverter
 from converters.elu_only import EluOnlyConverter
 from converters.ulc_c2 import ULCC2Converter
 from converters.field_device_testing import FieldDeviceTestingConverter
+from converters.hoses_only import HosesOnlyConverter
 from converters.base import DefaultConverter
 
 
@@ -31,6 +32,7 @@ EXPECTED_SHEETS = [
     "LOG REPORT C3.2- Device Record",
     "EXT only",
     "ELU only",
+    "HOSES only",
     "ULC - C2.1-2.12",
     "C3.1FieldDeviceTesting-Legend"
 ]
@@ -59,6 +61,7 @@ CONVERTER_MAPPING = {
     "LOG REPORT C3.2- Device Record": LogReportConverter,
     "EXT only": ExtOnlyConverter,
     "ELU only": EluOnlyConverter,
+    "HOESES only": HosesOnlyConverter,
     "ULC - C2.1-2.12": ULCC2Converter,
     "C3.1FieldDeviceTesting-Legend": FieldDeviceTestingConverter,
 }
