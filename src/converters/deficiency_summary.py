@@ -28,17 +28,25 @@ class DeficiencySummaryConverter(BaseSheetConverter):
 
     def does_cell_have_border(self, cell):
         if cell is None:
+            print("[Border Check] Cell is None → returning False")
             return False
 
         try:
-            for side in (1, 2, 3, 4):  # 1=Left, 2=Right, 3=Top, 4=Bottom
-                if cell.api.Borders(side).LineStyle != self.BORDER:
+            for side in (1, 2, 3, 4):  # Left, Right, Top, Bottom
+                border = cell.api.Borders(side)
+                print(f"[Border Check] {cell.address} side {side} → LineStyle = {border.LineStyle}")
+
+                if border.LineStyle != self.BORDER:
+                    print(f"[Border Check] {cell.address} → side {side} does not match BORDER ({self.BORDER}) → returning False")
                     return False
+
+            print(f"[Border Check] {cell.address} → All sides match BORDER ({self.BORDER}) → returning True")
             return True
 
-        except AttributeError:
-            # If cell.api is invalid
+        except AttributeError as e:
+            print(f"[Border Check] AttributeError on {cell.address if cell else 'Unknown'}: {e}")
             return False
+
 
     def is_cell_empty(self, cell):
         if cell is None:
@@ -58,14 +66,42 @@ class DeficiencySummaryConverter(BaseSheetConverter):
 
     def put_content_to_output(self, real_input_row, section_index, content_col, rel_row_to_place_content, rows_added_to_output, output_sheet):
         row_to_place_content = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + rel_row_to_place_content
-        col_letter = "A" if content_col == 0 else "B"
-        output_sheet.range(f"{col_letter}{row_to_place_content}").value = self.get_from_input_cell(f"{col_letter}{real_input_row}")
-    
-    def create_formatted_row_on_output(self, section_index, content_col, rel_row_to_place_content, rows_added_to_output, output_sheet):
-        row_to_insert = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + rel_row_to_place_content
-        output_sheet.range(f"{row_to_insert}:{row_to_insert}").insert(shift="down")
-        for side in (1, 2, 3, 4):  # 1=Left, 2=Right, 3=Top, 4=Bottom
-            output_sheet.range(f"A{row_to_insert}").api.Borders(side).LineStyle = self.BORDER
+        output_sheet.range(f"A{row_to_place_content}").value = self.get_from_input_cell(f"A{real_input_row}")
+        if content_col == 1:
+            output_sheet.range(f"B{row_to_place_content}").value = self.get_from_input_cell(f"B{real_input_row}")
+            self.apply_wrap_text_to_output_cell(
+                sheet_index_or_name="Deficiency Summary",
+                cell=f"B{row_to_place_content}",
+                wrap=True
+            )
+
+        self.copy_row_height_to_output(input_row_number=real_input_row, output_row_number=row_to_place_content, sheet_index_or_name="Deficiency Summary")
+        
+
+    def apply_thick_bottom_border(self, row_number, output_sheet):
+        """
+        Applies a thick bottom border (LineStyle=1, Weight=4, Color=0.0) across merged regions
+        of the specified row. Only applies to the top-left cell of each merged area.
+        """
+        if output_sheet.api.ProtectContents:
+            output_sheet.api.Unprotect()
+        
+        row_range = output_sheet.range(f"A{row_number}:L{row_number}")
+
+        for cell in row_range:
+            try:
+                border = cell.api.Borders(4)  # Bottom border
+
+                border.LineStyle = 1   # xlContinuous
+                border.Weight = 3      # xlThick
+                border.Color = 0.0     # Black
+
+                print(f"[Thick Bottom Border] Applied to merged range: {cell.api.Address} (row {row_number})")
+
+            except Exception as e:
+                print(f"[Thick Bottom Border] Failed at cell {cell.address}: {e}")
+
+        
 
 
     def convert(self):
@@ -73,7 +109,7 @@ class DeficiencySummaryConverter(BaseSheetConverter):
         if output_sheet.api.ProtectContents:
             output_sheet.api.Unprotect()
         
-        start_input_row = 19
+        start_input_row = 20
         end_input_row = 60
 
         input_range = self.input_sheet.range(f"A{start_input_row}:L{end_input_row}")
@@ -115,9 +151,9 @@ class DeficiencySummaryConverter(BaseSheetConverter):
             #   - Copy row height (15px, 48px, 96px) and formatting (bold if posisble) to output sheet
             if has_border:
                 if inbetween_sections:
-                    if not self.is_cell_empty(col_a_cell) and col_a_value == "Quantity":
+                    if not self.is_cell_empty(col_a_cell) and str(col_a_value).strip().lower() == "quantity":
                         print(f"Found new section header 'Quantity' at row {real_input_row}")
-                        inbetween_sections = False
+                        inbetween_sections = False 
                         section_index += 1
                         print(f"Incremented section_index to {section_index}")
                 elif not inbetween_sections:
@@ -132,19 +168,26 @@ class DeficiencySummaryConverter(BaseSheetConverter):
 
                         if num_input_rows_for_section >= self.NUM_ROWS_PER_SECTION[section_index]:
                             print(f"Exceeded predefined number of rows ({self.NUM_ROWS_PER_SECTION[section_index]}) for section {section_headers[section_index]}")
-                            self.create_formatted_row_on_output(section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
-                            rows_added_to_output += 1
+                            row_to_clone = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + num_input_rows_for_section - 1
+                            self.insert_formatted_row_below(output_sheet, row_to_clone, log_prefix="[Section Clone]")
                             print(f"Inserted new row, rows_added_to_output now {rows_added_to_output}")
-
-                        self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
+                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
+                            rows_added_to_output += 1
+                        else:
+                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
+                        
                         print(f"Transferred content from input row {real_input_row} to output section {section_headers[section_index]} row {num_input_rows_for_section}")
                         num_input_rows_for_section += 1
-
+                        
             if not has_border and previous_row_had_border:
                 if not inbetween_sections:
                     print(f"Entering inbetween_sections after row {real_input_row}")
-                inbetween_sections = True
-                num_input_rows_for_section = 0
+                    inbetween_sections = True
+                    if section_index == 1:
+                        previous_output_row = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + num_input_rows_for_section - 2
+                        self.apply_thick_bottom_border(previous_output_row, output_sheet)
+                    num_input_rows_for_section = 0
+
             
             previous_row_had_border = has_border
 
