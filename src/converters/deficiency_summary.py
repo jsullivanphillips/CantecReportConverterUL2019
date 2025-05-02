@@ -102,7 +102,11 @@ class DeficiencySummaryConverter(BaseSheetConverter):
                 print(f"[Thick Bottom Border] Failed at cell {cell.address}: {e}")
 
         
-
+    ## TODO:
+        # - Deficiency summary: still has a thick border in the middle of the section
+        # - EXT and ELU pages: need the ACT column font colour needs to be transfer - Set to black if no input value
+        # - Device Log: Would be great if new device log could auto size row height based on content. Look into this.
+        # - Device Log: smoke alarms don't have any check marks.
 
     def convert(self):
         output_sheet = self.output_wb.sheets["Deficiency Summary"]
