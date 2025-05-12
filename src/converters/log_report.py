@@ -180,8 +180,6 @@ class LogReportConverter(BaseSheetConverter):
         print_range = f"A1:M{last_written_row + 5}"
         output_sheet.api.PageSetup.PrintArea = f"${print_range.replace(':', ':$')}"
 
-        # 🔒 Re-protect
-        output_sheet.api.Protect()
         # endregion
 
 

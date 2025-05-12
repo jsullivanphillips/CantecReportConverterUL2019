@@ -207,15 +207,6 @@ class BaseSheetConverter:
             except Exception as e:
                 raise ValueError(f"Failed to set WrapText on cell '{cell}' in sheet '{sheet.name}': {e}")
 
-            # Re-protect the sheet if needed
-            try:
-                if password:
-                    sheet.api.Protect(Password=password)
-                else:
-                    sheet.api.Protect()
-            except Exception as e:
-                print(f"[WARNING] Failed to re-protect sheet '{sheet.name}': {e}")
-
         except Exception as final_error:
             raise Exception(f"[apply_wrap_text_to_output_cell ERROR] {final_error}")
 
@@ -259,12 +250,6 @@ class BaseSheetConverter:
                 print(f"[INFO] Row height {input_height} copied from input row {input_row_number} to output row {output_row_number} on '{sheet.name}'")
             except Exception as e:
                 raise ValueError(f"Could not set row height on output row {output_row_number}: {e}")
-
-            # Re-protect sheet
-            if password:
-                sheet.api.Protect(Password=password)
-            else:
-                sheet.api.Protect()
 
         except Exception as final_error:
             raise Exception(f"[copy_row_height_to_output ERROR] {final_error}")
@@ -311,12 +296,6 @@ class BaseSheetConverter:
                     sheet[cell].api.WrapText = wrap_text
             except Exception as e:
                 raise ValueError(f"Invalid cell reference '{cell}' on sheet '{sheet.name}': {e}")
-
-            # Re-protect the sheet
-            if password:
-                sheet.api.Protect(Password=password)
-            else:
-                sheet.api.Protect()
 
         except Exception as final_error:
             # You could log or re-raise here depending on how you want to handle it

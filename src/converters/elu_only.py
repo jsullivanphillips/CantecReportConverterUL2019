@@ -81,6 +81,5 @@ class EluOnlyConverter(BaseSheetConverter):
         print_range = f"A1:H{last_written_row}"
         output_sheet.api.PageSetup.PrintArea = f"${print_range.replace(':', ':$')}"
 
-        # 🔒 Re-protect
-        output_sheet.api.Protect()
+        
         # endregion
