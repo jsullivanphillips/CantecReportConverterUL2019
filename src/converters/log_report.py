@@ -104,7 +104,7 @@ class LogReportConverter(BaseSheetConverter):
             else:
                 number_of_consecutive_empty_rows = 0
 
-            if number_of_consecutive_empty_rows >= 100:
+            if number_of_consecutive_empty_rows >= 60:
                 break
 
             # Always record row (even if blank) to preserve spacing
@@ -134,7 +134,6 @@ class LogReportConverter(BaseSheetConverter):
                 device_address_and_loop = ""
 
 
-
             col_A.append(device_location)
             col_C.append(row_data[2])   # From D
             col_D.append(row_data[13])  # From O
@@ -159,15 +158,15 @@ class LogReportConverter(BaseSheetConverter):
         output_sheet.range(f"F{start_output_row}:F{end_row}").value = [[v] for v in col_F]
         output_sheet.range(f"D{start_output_row}:D{end_row}").value = [[v] for v in col_D]
         output_sheet.range(f"M{start_output_row}:M{end_row}").value = [[v] for v in col_M]
-
-        output_sheet.range(f"G{start_output_row}:G{end_row}").value = self.clean_column(col_G)
         
-        for i, (op_confirmed, ann_confirmed) in enumerate(zip(col_I, col_J)):
+        for i, (op_confirmed, ann_confirmed, install_corr) in enumerate(zip(col_I, col_J, col_G)):
             row = start_output_row + i
             if op_confirmed:  # only write if not empty
                 output_sheet.range(f"I{row}").value = op_confirmed
             if ann_confirmed:
                 output_sheet.range(f"J{row}").value = ann_confirmed
+            if install_corr:
+                output_sheet.range(f"G{row}").value = install_corr
 
 
         # Step 4: Apply bold formatting only where needed

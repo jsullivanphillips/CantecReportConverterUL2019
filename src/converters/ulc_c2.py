@@ -10,6 +10,9 @@ class ULCC2Converter(BaseSheetConverter):
     def convert(self):
         print("ULC CONVERTER RUNNING")
         # region 22 | CU or Transp Insp
+        # CU or Transponder Location
+        self.put_to_output_cell("22.1 | CU or Transp Insp", "H15", self.get_from_input_cell("E5"))
+
         # Input in relation to connected field devices
         self.transfer_checkbox_rating('A49', "22.1 | CU or Transp Insp", 17)
 
@@ -70,10 +73,14 @@ class ULCC2Converter(BaseSheetConverter):
         # Input circuit, alarm & supervisory operation, including audible
         self.transfer_checkbox_rating('A29', "22.2 | CU or Transp Test", 28, col_yes='L', col_no='N', col_na='P')
 
-        # (31 - 39) : (29 - 36)
-        for i, input_row in enumerate(range(31, 40), start=29):
+        # (31 - 35) : (29 - 33)
+        for i, input_row in enumerate(range(31, 36), start=29):
             self.transfer_checkbox_rating(f'A{input_row}', "22.2 | CU or Transp Test", i, col_yes='L', col_no='N', col_na='P')
         
+        # (37 - 39) : (34 - 36)
+        for i, input_row in enumerate(range(37, 40), start=34):
+            self.transfer_checkbox_rating(f'A{input_row}', "22.2 | CU or Transp Test", i, col_yes='L', col_no='N', col_na='P')
+
         # (43 - 45) : (37 - 39)
         for i, input_row in enumerate(range(43, 46), start=37):
             self.transfer_checkbox_rating(f'A{input_row}', "22.2 | CU or Transp Test", i, col_yes='L', col_no='N', col_na='P')
@@ -147,7 +154,7 @@ class ULCC2Converter(BaseSheetConverter):
         battery_terminal_voltage = self.get_from_input_cell('N49')
         self.put_to_output_cell("22.5 | Power Supply(s)", "K38", battery_terminal_voltage)
 
-        self.transfer_checkbox_rating('H50', "22.5 | Power Supply(s)", 38, col_yes='L', col_no='N', col_na='P')
+        self.transfer_checkbox_rating('H50', "22.5 | Power Supply(s)", 39, col_yes='L', col_no='N', col_na='P')
 
         battery_charging_current = self.get_from_input_cell('M26')
         self.put_to_output_cell("22.5 | Power Supply(s)", "K40", battery_charging_current)
@@ -174,7 +181,13 @@ class ULCC2Converter(BaseSheetConverter):
 
 
         # region 22.7 | Annun & Seq Disp
-        if str(self.get_from_input_cell('E90')).strip().upper() == "NOT APPLICABLE":
+        raw_value = self.get_from_input_cell('E90')
+        value = str(raw_value).strip() if raw_value is not None else ""
+
+        print(f"VALUE in E90 = [{value}]")
+
+        if value.upper() == "NOT APPLICABLE" or value == "":
+            print("No sequential displays")
             self.put_to_output_cell("22.7 | Annun & Seq Disp", "J6", "True")
         else:
             sequential_display_location = self.get_from_input_cell('E90')

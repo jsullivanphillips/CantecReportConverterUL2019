@@ -34,13 +34,10 @@ class DeficiencySummaryConverter(BaseSheetConverter):
         try:
             for side in (1, 2, 3, 4):  # Left, Right, Top, Bottom
                 border = cell.api.Borders(side)
-                print(f"[Border Check] {cell.address} side {side} → LineStyle = {border.LineStyle}")
+                
 
                 if border.LineStyle != self.BORDER:
-                    print(f"[Border Check] {cell.address} → side {side} does not match BORDER ({self.BORDER}) → returning False")
                     return False
-
-            print(f"[Border Check] {cell.address} → All sides match BORDER ({self.BORDER}) → returning True")
             return True
 
         except AttributeError as e:
@@ -69,9 +66,15 @@ class DeficiencySummaryConverter(BaseSheetConverter):
         output_sheet.range(f"A{row_to_place_content}").value = self.get_from_input_cell(f"A{real_input_row}")
         if content_col == 1:
             output_sheet.range(f"B{row_to_place_content}").value = self.get_from_input_cell(f"B{real_input_row}")
+            output_sheet.range(f"J{row_to_place_content}").value = self.get_from_input_cell(f"J{real_input_row}")
             self.apply_wrap_text_to_output_cell(
                 sheet_index_or_name="Deficiency Summary",
                 cell=f"B{row_to_place_content}",
+                wrap=True
+            )
+            self.apply_wrap_text_to_output_cell(
+                sheet_index_or_name="Deficiency Summary",
+                cell=f"J{row_to_place_content}",
                 wrap=True
             )
 
@@ -153,14 +156,14 @@ class DeficiencySummaryConverter(BaseSheetConverter):
             ## TODO: 
             #   - Test with wild wacky inputs
             #   - Copy row height (15px, 48px, 96px) and formatting (bold if posisble) to output sheet
-            if has_border:
-                if inbetween_sections:
+            if inbetween_sections:
                     if not self.is_cell_empty(col_a_cell) and str(col_a_value).strip().lower() == "quantity":
                         print(f"Found new section header 'Quantity' at row {real_input_row}")
                         inbetween_sections = False 
                         section_index += 1
                         print(f"Incremented section_index to {section_index}")
-                elif not inbetween_sections:
+            elif has_border:
+                if not inbetween_sections:
                     content_col = 0 if section_index == 0 else 1
                     
                     if section_index == 0 and num_input_rows_for_section > 0:
@@ -172,13 +175,13 @@ class DeficiencySummaryConverter(BaseSheetConverter):
 
                         if num_input_rows_for_section >= self.NUM_ROWS_PER_SECTION[section_index]:
                             print(f"Exceeded predefined number of rows ({self.NUM_ROWS_PER_SECTION[section_index]}) for section {section_headers[section_index]}")
-                            row_to_clone = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + num_input_rows_for_section - 1
+                            row_to_clone = self.OUTPUT_SECTION_ROW_START[section_index] + num_input_rows_for_section - 1
                             self.insert_formatted_row_below(output_sheet, row_to_clone, log_prefix="[Section Clone]")
                             print(f"Inserted new row, rows_added_to_output now {rows_added_to_output}")
-                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
+                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
                             rows_added_to_output += 1
                         else:
-                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, rows_added_to_output, output_sheet)
+                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
                         
                         print(f"Transferred content from input row {real_input_row} to output section {section_headers[section_index]} row {num_input_rows_for_section}")
                         num_input_rows_for_section += 1
@@ -187,10 +190,19 @@ class DeficiencySummaryConverter(BaseSheetConverter):
                 if not inbetween_sections:
                     print(f"Entering inbetween_sections after row {real_input_row}")
                     inbetween_sections = True
+                    
                     if section_index == 1:
-                        previous_output_row = self.OUTPUT_SECTION_ROW_START[section_index] + rows_added_to_output + num_input_rows_for_section - 2
+                        # Adding thick border to top section of deficiency summary
+                        previous_output_row = self.OUTPUT_SECTION_ROW_START[section_index] + num_input_rows_for_section - 1
                         self.apply_thick_bottom_border(previous_output_row, output_sheet)
+                    
+                    # Updating pointers of output section starts if rows were added
+                    if rows_added_to_output != 0:
+                        for index in range(section_index, len(self.OUTPUT_SECTION_ROW_START)):
+                                self.OUTPUT_SECTION_ROW_START[index] += rows_added_to_output
+                    
                     num_input_rows_for_section = 0
+                    rows_added_to_output = 0
 
             
             previous_row_had_border = has_border

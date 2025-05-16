@@ -42,7 +42,7 @@ class ExtOnlyConverter(BaseSheetConverter):
             else:
                 number_of_consecutive_empty_rows = 0
 
-            if number_of_consecutive_empty_rows >= 100:
+            if number_of_consecutive_empty_rows >= 50:
                 break
 
             # Always record row (even if blank) to preserve spacing

@@ -22,6 +22,8 @@ from converters.elu_only import EluOnlyConverter
 from converters.ulc_c2 import ULCC2Converter
 from converters.field_device_testing import FieldDeviceTestingConverter
 from converters.hoses_only import HosesOnlyConverter
+from converters.booster import BoosterConverter
+from converters.extra_annunciators import ExtraAnnunciatorConverter
 from converters.base import DefaultConverter
 
 
@@ -61,30 +63,44 @@ CONVERTER_MAPPING = {
     "LOG REPORT C3.2- Device Record": LogReportConverter,
     "EXT only": ExtOnlyConverter,
     "ELU only": EluOnlyConverter,
-    "HOESES only": HosesOnlyConverter,
+    "HOSES only": HosesOnlyConverter,
     "ULC - C2.1-2.12": ULCC2Converter,
     "C3.1FieldDeviceTesting-Legend": FieldDeviceTestingConverter,
 }
 
 def detect_expected_sheets(input_filepath):
-    """Open the input workbook and return a list of expected sheet names found."""
+    """Open the input workbook and return a list of expected and booster-matched sheet names found."""
     try:
         app = xw.App(visible=False)
         wb = app.books.open(input_filepath)
-        found = [sheet.name for sheet in wb.sheets if sheet.name.strip() in EXPECTED_SHEETS]
+
+        found = []
+        for sheet in wb.sheets:
+            name = sheet.name.strip()
+            if name in EXPECTED_SHEETS:
+                found.append(name)
+            elif "booster" in name.lower():
+                print(f"Detected booster sheet: {name}")
+                found.append(name)
+            elif "annunciators" in name.lower():
+                print(f"Detected annunciator sheet: {name}")
+                found.append(name)
+
         wb.close()
         app.quit()
         return found
+
     except Exception as e:
         messagebox.showerror("Error", f"Error detecting sheets:\n{e}")
         return []
+
 
 def confirm_sheets_dialog(found_sheets, parent):
     """Displays a modal dialog with checkboxes for each detected sheet.
     Returns the list of sheets the user confirms."""
     dialog = tk.Toplevel(parent)
     dialog.title("Confirm Sheets to Convert")
-    dialog.geometry("300x300")
+    dialog.geometry("300x365")
     dialog.grab_set()  # Modal dialog
 
     tk.Label(dialog, text="Select the sheets to process:").pack(pady=10)
@@ -122,26 +138,46 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
         app.api.DisplayAlerts = False
 
         input_wb = xw.Book(input_filepath, update_links=False)
+        sheet_name_map = {
+            sheet.name.strip(): sheet.name
+            for sheet in input_wb.sheets
+        }
         print(f"{input_filepath} has been opened with xlwings")
         template_wb = xw.Book(temp_template_path, update_links=False)
         print(f"{template_wb} has been opened with xlwings")
 
         # Process each confirmed sheet
         total = len(sheets_to_convert)
-       
+
+        booster_count = 1
+        print("Booster line passed")
+        print(f"num sheets to convert: {total}")
+        print(sheets_to_convert)
         for idx, sheet_name in enumerate(sheets_to_convert, start=1):
-                  
-            input_sheet = input_wb.sheets[sheet_name]
-            
-            converter_class = CONVERTER_MAPPING.get(sheet_name.strip(), DefaultConverter)
-            
-            converter = converter_class(input_sheet, template_wb)
-            
+            actual_sheet_name = sheet_name_map.get(sheet_name.strip())
+            if actual_sheet_name is None:
+                print(f"Sheet '{sheet_name}' not found in workbook.")
+                continue  # or raise
+
+            input_sheet = input_wb.sheets[actual_sheet_name]
+            print(f"opening input sheet: {input_sheet.name}")
+
+            if "booster" in sheet_name.lower():
+                converter = BoosterConverter(input_sheet, template_wb, booster_count)
+                booster_count += 1
+            elif "annunciators" in sheet_name.lower():
+                converter = ExtraAnnunciatorConverter(input_sheet, template_wb)
+            else:
+                converter_class = CONVERTER_MAPPING.get(sheet_name.strip(), DefaultConverter)
+                print(f"using converter class {converter_class}")
+                converter = converter_class(input_sheet, template_wb)
+
             converter.convert()
             print(f"{sheet_name} converted")
 
             if progress_callback:
                 progress_callback(sheet_name, idx, total)
+
 
         input_path = Path(input_filepath)
         input_name = input_path.stem
