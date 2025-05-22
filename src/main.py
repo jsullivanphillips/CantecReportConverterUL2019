@@ -53,7 +53,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # Path to your template file.
-TEMPLATE_FILENAME = "Annual ULC Template - CAN,ULC-S536-19 v1.0.xlsx"
+TEMPLATE_FILENAME = "Annual ULC Template - CAN,ULC-S536-19 v8.xlsx"
 TEMPLATE_PATH = resource_path(os.path.join("report_templates", TEMPLATE_FILENAME))
 
 # Dispatcher: mapping input sheet names to converter classes.
@@ -187,7 +187,7 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
         match = re.search(r"v7", input_name, re.IGNORECASE)
         if match:
             start, end = match.span()
-            output_name = input_name[:start] + "S536-19 v1.0" + input_name[end:]
+            output_name = input_name[:start] + "V8" + input_name[end:]
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_name = f"Converted_Report_{timestamp}"

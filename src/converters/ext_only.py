@@ -21,7 +21,7 @@ class ExtOnlyConverter(BaseSheetConverter):
 
         # Step 1: Read input data
         input_data = self.input_sheet.range("A10:H2000").value
-        start_output_row = 13
+        start_output_row = 15
         max_input_rows = len(input_data)
 
         col_A, col_B, col_C, col_D, col_E, col_F, col_G, bold_mask = [], [], [], [], [], [], [], []
@@ -29,6 +29,7 @@ class ExtOnlyConverter(BaseSheetConverter):
         number_of_consecutive_empty_rows = 0
         last_written_row = start_output_row - 1
 
+        print("enumerating input data")
         for rel_row, row_data in enumerate(input_data):
             input_row = 10 + rel_row
             output_row = start_output_row + rel_row
@@ -75,6 +76,7 @@ class ExtOnlyConverter(BaseSheetConverter):
         # Step 3.5: Set font style to Calibri for column A
         output_sheet.range(f"A{start_output_row}:A{end_row}").font.name = "Calibri"
 
+        print("enumerating bold")
         # Step 4: Apply bold formatting only where needed
         for i, is_bold in enumerate(bold_mask):
             if is_bold:

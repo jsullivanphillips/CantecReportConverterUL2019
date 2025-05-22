@@ -163,28 +163,27 @@ class DeficiencySummaryConverter(BaseSheetConverter):
                         section_index += 1
                         print(f"Incremented section_index to {section_index}")
             elif has_border:
-                if not inbetween_sections:
-                    content_col = 0 if section_index == 0 else 1
+                content_col = 0 if section_index == 0 else 1
+                
+                if section_index == 0 and num_input_rows_for_section > 0:
+                    print(f"Skipping extra MBT rows in owner_responsible_01 at row {real_input_row}")
+                    continue
+
+                if not self.is_cell_empty(row_cells[content_col]):
+                    print(f"Found content at row {real_input_row} (content_col={content_col})")
+
+                    if num_input_rows_for_section >= self.NUM_ROWS_PER_SECTION[section_index]:
+                        print(f"Exceeded predefined number of rows ({self.NUM_ROWS_PER_SECTION[section_index]}) for section {section_headers[section_index]}")
+                        row_to_clone = self.OUTPUT_SECTION_ROW_START[section_index] + num_input_rows_for_section - 1
+                        self.insert_formatted_row_below(output_sheet, row_to_clone, log_prefix="[Section Clone]")
+                        print(f"Inserted new row, rows_added_to_output now {rows_added_to_output}")
+                        self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
+                        rows_added_to_output += 1
+                    else:
+                        self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
                     
-                    if section_index == 0 and num_input_rows_for_section > 0:
-                        print(f"Skipping extra MBT rows in owner_responsible_01 at row {real_input_row}")
-                        continue
-
-                    if not self.is_cell_empty(row_cells[content_col]):
-                        print(f"Found content at row {real_input_row} (content_col={content_col})")
-
-                        if num_input_rows_for_section >= self.NUM_ROWS_PER_SECTION[section_index]:
-                            print(f"Exceeded predefined number of rows ({self.NUM_ROWS_PER_SECTION[section_index]}) for section {section_headers[section_index]}")
-                            row_to_clone = self.OUTPUT_SECTION_ROW_START[section_index] + num_input_rows_for_section - 1
-                            self.insert_formatted_row_below(output_sheet, row_to_clone, log_prefix="[Section Clone]")
-                            print(f"Inserted new row, rows_added_to_output now {rows_added_to_output}")
-                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
-                            rows_added_to_output += 1
-                        else:
-                            self.put_content_to_output(real_input_row, section_index, content_col, num_input_rows_for_section, 0, output_sheet)
-                        
-                        print(f"Transferred content from input row {real_input_row} to output section {section_headers[section_index]} row {num_input_rows_for_section}")
-                        num_input_rows_for_section += 1
+                    print(f"Transferred content from input row {real_input_row} to output section {section_headers[section_index]} row {num_input_rows_for_section}")
+                num_input_rows_for_section += 1
                         
             if not has_border and previous_row_had_border:
                 if not inbetween_sections:

@@ -8,7 +8,7 @@ put_to_output_cell(self, sheet_index_or_name, cell, value):
 """
 class EluOnlyConverter(BaseSheetConverter):
     def convert(self):
-        # region EXT only
+        # region ELUonly
         output_sheet = self.output_wb.sheets["ELU only"]
 
         # 🔓 Unprotect once at the beginning
@@ -17,7 +17,7 @@ class EluOnlyConverter(BaseSheetConverter):
 
         # Step 1: Read input data
         input_data = self.input_sheet.range("A10:H2000").value
-        start_output_row = 15
+        start_output_row = 16
         max_input_rows = len(input_data)
 
         col_A, col_B, col_C, col_D, col_E, col_F, col_G, bold_mask = [], [], [], [], [], [], [], []
@@ -25,6 +25,7 @@ class EluOnlyConverter(BaseSheetConverter):
         number_of_consecutive_empty_rows = 0
         last_written_row = start_output_row - 1
 
+        print("enumerate input data")
         for rel_row, row_data in enumerate(input_data):
             input_row = 10 + rel_row
             output_row = start_output_row + rel_row
@@ -72,6 +73,7 @@ class EluOnlyConverter(BaseSheetConverter):
         output_sheet.range(f"A{start_output_row}:A{end_row}").font.name = "Calibri"
 
         # Step 4: Apply bold formatting only where needed
+        print("enumerating bold")
         for i, is_bold in enumerate(bold_mask):
             if is_bold:
                 row = start_output_row + i
@@ -81,5 +83,5 @@ class EluOnlyConverter(BaseSheetConverter):
         print_range = f"A1:H{last_written_row}"
         output_sheet.api.PageSetup.PrintArea = f"${print_range.replace(':', ':$')}"
 
-        
+        output_sheet.api.Protect(DrawingObjects=True, Contents=True, Scenarios=True)
         # endregion
