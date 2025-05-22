@@ -210,6 +210,46 @@ class BaseSheetConverter:
         except Exception as final_error:
             raise Exception(f"[apply_wrap_text_to_output_cell ERROR] {final_error}")
 
+    def get_from_output_cell(self, sheet_index_or_name, cell, password=None):
+        """
+        Safely retrieves a value from a cell in the output workbook, with support for unprotecting sheets if needed.
+
+        Parameters:
+        - sheet_index_or_name: int or str — the index (e.g., 0) or name (e.g., 'Summary') of the sheet
+        - cell: str — the Excel cell reference (e.g., 'A12')
+        - password: str or None — optional password to unprotect the sheet if needed
+
+        Returns:
+        - The value in the specified cell, or raises an exception with a descriptive error.
+        """
+        try:
+            # Validate and access the sheet
+            try:
+                sheet = self.output_wb.sheets[sheet_index_or_name]
+            except Exception as e:
+                raise ValueError(f"Invalid sheet reference '{sheet_index_or_name}': {e}")
+
+            # Attempt to unprotect the sheet (usually not needed just for reading, but included for parity)
+            if sheet.api.ProtectContents:
+                try:
+                    if password:
+                        sheet.api.Unprotect(Password=password)
+                    else:
+                        sheet.api.Unprotect()
+                except Exception as e:
+                    raise PermissionError(f"Could not unprotect sheet '{sheet.name}': {e}")
+
+            # Try reading from the specified cell
+            try:
+                return sheet[cell].value
+            except Exception as e:
+                raise ValueError(f"Invalid cell reference '{cell}' on sheet '{sheet.name}': {e}")
+
+        except Exception as final_error:
+            raise Exception(f"[get_from_output_cell ERROR] {final_error}")
+
+
+
 
     def copy_row_height_to_output(self, input_row_number, output_row_number, sheet_index_or_name, password=None):
         """

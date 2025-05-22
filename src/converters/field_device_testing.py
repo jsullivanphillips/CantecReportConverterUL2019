@@ -1,5 +1,4 @@
 # src/converters/field_device_testing.py
-
 from .base import BaseSheetConverter
 """
 get_from_input_cell(self, cell):
@@ -8,80 +7,83 @@ put_to_output_cell(self, sheet_index_or_name, cell, value):
 """
 class FieldDeviceTestingConverter(BaseSheetConverter):
     def convert(self):
-        # region 23.1 Field Device Legend
-        # M, RHT -> M, RHT
-        for i, input_row in enumerate(range(5, 7), start=8):
-            type = self.get_from_input_cell(f"I{input_row}")
-            model = self.get_from_input_cell(f"K{input_row}")
-            if type is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"L{i}", str(type).upper())
-            if model is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"N{i}", str(model).upper())
-        
-        # HHT -> HT
-        type = self.get_from_input_cell(f"I8")
-        model = self.get_from_input_cell(f"K8")
-        if type is not None:
-            self.put_to_output_cell("23.1 Field Device Legend", f"L10", str(type).upper())
-        if model is not None:
-            self.put_to_output_cell("23.1 Field Device Legend", f"N10", str(model).upper())
+        input_range = range(5, 50)
+        output_range = range(5, 50)
+        output_sheet_name = "23.1 Field Device Legend"
 
-        # S -> S
-        types = ""
-        models = ""
-        i = 0
-        for row in range(8, 12):
-            cell_I = f"I{row}"
-            cell_K = f"K{row}"
-            type_val = self.get_from_input_cell(cell_I)
-            model_val = self.get_from_input_cell(cell_K)
+        input_data_by_key = {}
+        s_device_rows = []
 
-            print(f"Row {row} - I: {type_val}, K: {model_val}")
+        # Step 1: Detect merged "S" device region using xlwings
+        for row in input_range:
+            cell = self.input_sheet.range(f"A{row}")
+            val = cell.value
+            if val and str(val).strip().upper() == "S":
+                merged_area = cell.merge_area
+                if merged_area:
+                    s_device_rows = list(range(merged_area.row, merged_area.row + merged_area.rows.count))
+                else:
+                    s_device_rows = [row]
+                break
 
-            if i != 0:
-                types += " / "
-                models += " / "
+        # Step 2: Collect data for all non-"S" device rows
+        for row in input_range:
+            if row in s_device_rows:
+                continue
 
-            if type_val is not None:
-                types += type_val
-            if model_val is not None:
-                models += model_val
+            key = self.get_from_input_cell(f"A{row}")
+            type_val = self.get_from_input_cell(f"I{row}")
+            model_val = self.get_from_input_cell(f"K{row}")
+            optional_val = self.get_from_input_cell(f"O{row}")
 
-            i += 1
+            if key and (model_val or optional_val):
+                formatted_type = self._format_device_value(type_val)
+                formatted_model = self._format_device_value(model_val)
+                input_data_by_key[str(key).strip().upper()] = {
+                    "type": formatted_type,
+                    "model": formatted_model
+                }
 
-        # Remove the trailing " / " if at least one row was added
-        if i != 0:
-            types = types.rstrip(" /")
-            models = models.rstrip(" /")
+        # Step 3: Match keys and insert formatted type/model into output
+        for row in output_range:
+            out_key_val = self.get_from_output_cell(output_sheet_name, f"A{row}")
+            if out_key_val:
+                out_key_str = str(out_key_val).strip().upper()
+                if out_key_str in input_data_by_key:
+                    data = input_data_by_key[out_key_str]
+                    if data["type"]:
+                        self.put_to_output_cell(output_sheet_name, f"L{row}", data["type"])
+                    if data["model"]:
+                        self.put_to_output_cell(output_sheet_name, f"N{row}", data["model"])
 
-        print(f"Final types: '{types}'")
-        print(f"Final models: '{models}'")
+        # Step 4: Handle "S" device rows (no comma formatting)
+        s_types = []
+        s_models = []
 
-        if types:
-            print("Writing to F13:", types.upper())
-            self.put_to_output_cell("23.1 Field Device Legend", "F13", str(types).upper())
-        if models:
-            print("Writing to H15:", models.upper())
-            self.put_to_output_cell("23.1 Field Device Legend", "H15", str(models).upper())
+        for row in s_device_rows:
+            type_val = self.get_from_input_cell(f"I{row}")
+            model_val = self.get_from_input_cell(f"K{row}")
+            if type_val:
+                s_types.append(str(type_val).strip().upper())
+            if model_val:
+                s_models.append(str(model_val).strip().upper())
 
-    
-        # RI, DS, OTHER TYPE, SFD, FS, SS,  OTHER SUPERVISORY, 
-        # ISO -> EM FAULT ISOLATOR, B, BZ, H, V, SP, HSP,
-        for i, input_row in enumerate(range(12, 26), start=20):
-            type = self.get_from_input_cell(f"I{input_row}")
-            model = self.get_from_input_cell(f"K{input_row}")
-            if type is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"L{i}", str(type).upper())
-            if model is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"N{i}", str(model).upper())
+        if s_types:
+            self.put_to_output_cell(output_sheet_name, "F13", " / ".join(s_types))
+        if s_models:
+            self.put_to_output_cell(output_sheet_name, "H15", " / ".join(s_models))
 
-        # AD, ET, EOL
-        for i, input_row in enumerate(range(27, 30), start=36):
-            type = self.get_from_input_cell(f"I{input_row}")
-            model = self.get_from_input_cell(f"K{input_row}")
-            if type is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"L{i}", str(type).upper())
-            if model is not None:
-                self.put_to_output_cell("23.1 Field Device Legend", f"N{i}", str(model).upper())
-        # endregion
+    def _format_device_value(self, value):
+        """
+        If the value contains commas, normalize to ' / ' separators and strip whitespace.
+        Otherwise, return the stripped uppercase value.
+        """
+        if value is None:
+            return ""
+        value = str(value).strip().upper()
+        if "," in value:
+            parts = [part.strip().upper() for part in value.split(",")]
+            return " / ".join(parts)
+        return value
+
 
