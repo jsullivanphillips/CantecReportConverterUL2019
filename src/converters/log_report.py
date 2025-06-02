@@ -49,6 +49,9 @@ class LogReportConverter(BaseSheetConverter):
 
         fap_identification = fap_make + " " + fap_model
         self.put_to_output_cell("22.1 | CU or Transp Insp", 'H16', fap_identification)
+
+        self.put_to_output_cell("20.1 | Report", "D13", fap_make)
+        self.put_to_output_cell("20.1 | Report", "D14", fap_model)
         # endregion
 
 
@@ -86,7 +89,7 @@ class LogReportConverter(BaseSheetConverter):
         start_output_row = 14
         max_input_rows = len(input_data)
 
-        col_A, col_C, col_D, col_E, col_G, col_I, col_J, col_F, col_M, bold_mask = [], [], [], [], [], [], [], [], [], []
+        col_A, col_C, col_D, col_E, col_G, col_I, col_J, col_F, col_H, col_M, bold_mask = [], [], [], [], [], [], [], [], [], [], []
 
         number_of_consecutive_empty_rows = 0
         last_written_row = start_output_row - 1
@@ -94,7 +97,7 @@ class LogReportConverter(BaseSheetConverter):
         for rel_row, row_data in enumerate(input_data):
             input_row = 22 + rel_row
             output_row = start_output_row + rel_row
-            last_written_row = output_row
+            
 
             device_location = row_data[0]  # column B
 
@@ -103,46 +106,70 @@ class LogReportConverter(BaseSheetConverter):
                 number_of_consecutive_empty_rows += 1
             else:
                 number_of_consecutive_empty_rows = 0
+                last_written_row = output_row
 
             if number_of_consecutive_empty_rows >= 60:
                 break
 
-            # Always record row (even if blank) to preserve spacing
-            col_M_data = ""
             sa_replacement_year = row_data[11]
-            if sa_replacement_year is not None:
-                col_M_data = f"Due to be replaced in {int(sa_replacement_year)}."
-                if row_data[14] is not None:
-                    col_M_data += " " + str(row_data[14])
+            skip_testing_data = (str(sa_replacement_year).strip().lower() == 'm')
+
+            if skip_testing_data:
+                # Only retain location, device type, and remarks
+                col_A.append(device_location)
+                col_C.append(row_data[2])
+                col_D.append("-")      
+                col_E.append("-")
+                col_F.append("-")
+                col_G.append("-")
+                col_I.append("-")
+                col_J.append("-")
+                col_M.append(str(row_data[14]).lstrip() if row_data[14] is not None else "")
             else:
-                col_M_data = row_data[14]
-            
-            # check for failures
-            operation_confirmed = "✖" if row_data[3] == 5 else ""
-            annunciation_confirmed = "✖" if row_data[4] == 5 else ""
-            installed_correctly = "N" if row_data[12] == 5 else ""
+                col_H_data = ""
+                if sa_replacement_year is not None:
+                    try:
+                        replacement_year = int(sa_replacement_year)
+                        col_H_data = f"{replacement_year}"
+                    except (ValueError, TypeError):
+                        col_H_data = f"{sa_replacement_year}"
+                
 
-            loop = row_data[7]
-            device = row_data[8]
+                operation_confirmed = "✖" if row_data[3] == 5 else ""
+                annunciation_confirmed = "✖" if row_data[4] == 5 else ""
+                installed_correctly = "N" if row_data[12] == 5 else ""
 
-            loop_str = str(int(loop)) if loop is not None else ""
-            device_str = str(device).zfill(3) if device is not None else ""
+                loop = row_data[7]
+                device = row_data[8]
 
-            if loop_str and device_str:
-                device_address_and_loop = f"Loop {loop_str}, {device_str}"
-            else:
-                device_address_and_loop = ""
+                if loop is not None:
+                    try:
+                        loop_str = str(int(loop))
+                    except (ValueError, TypeError):
+                        loop_str = str(loop)
+                else:
+                    loop_str = ""
+
+                device_str = str(device).zfill(3) if device is not None else ""
+
+                if loop_str and device_str:
+                    device_address_and_loop = f"Loop {loop_str}, {device_str}"
+                else:
+                    device_address_and_loop = ""
+
+                col_A.append(device_location)
+                col_C.append(row_data[2])   # From D
+                col_D.append(row_data[13])  # From O
+                col_E.append(device_address_and_loop)
+                col_F.append(row_data[6])   # From H
+                col_G.append(installed_correctly)
+                col_I.append(operation_confirmed)
+                col_J.append(annunciation_confirmed)
+                col_H.append(col_H_data)
+                col_M.append(str(row_data[14]).lstrip() if row_data[14] is not None else "")
 
 
-            col_A.append(device_location)
-            col_C.append(row_data[2])   # From D
-            col_D.append(row_data[13])  # From O
-            col_E.append(device_address_and_loop)   # From I + J -> Circuit number or device address
-            col_F.append(row_data[6])   # From H -> Annunciated Fire ZONE
-            col_G.append(installed_correctly)
-            col_I.append(operation_confirmed)
-            col_J.append(annunciation_confirmed)
-            col_M.append(col_M_data)  # From P
+
 
             # Track bold (True/False/None)
             is_bold = self.input_sheet.range(f"B{input_row}").font.bold
@@ -156,6 +183,7 @@ class LogReportConverter(BaseSheetConverter):
         output_sheet.range(f"C{start_output_row}:C{end_row}").value = [[v] for v in col_C]
         output_sheet.range(f"E{start_output_row}:E{end_row}").value = [[v] for v in col_E]
         output_sheet.range(f"F{start_output_row}:F{end_row}").value = [[v] for v in col_F]
+        output_sheet.range(f"H{start_output_row}:H{end_row}").value = [[v] for v in col_H]
         output_sheet.range(f"D{start_output_row}:D{end_row}").value = [[v] for v in col_D]
         output_sheet.range(f"M{start_output_row}:M{end_row}").value = [[v] for v in col_M]
         
@@ -167,6 +195,30 @@ class LogReportConverter(BaseSheetConverter):
                 output_sheet.range(f"J{row}").value = ann_confirmed
             if install_corr:
                 output_sheet.range(f"G{row}").value = install_corr
+
+        # Set row height based on length of remarks in col_M
+        for i, (remark, location) in enumerate(zip(col_M, col_A)):
+            if not remark and not location:
+                continue
+
+            def estimate_lines(text):
+                text_str = str(text).strip()
+                if not text_str:
+                    return 1
+                manual_lines = text_str.count('\n') + 1
+                char_count = len(text_str) + 3  # small buffer for wrapping
+                wrapped_lines = (char_count - 1) // 33 + 1
+                return min(max(manual_lines, wrapped_lines), 6)
+
+            lines_needed_remark = estimate_lines(remark)
+            lines_needed_location = estimate_lines(location)
+
+            lines_needed = max(lines_needed_remark, lines_needed_location)
+
+            height = 15 if lines_needed == 1 else lines_needed * 12
+
+            row = start_output_row + i
+            output_sheet.range(f"{row}:{row}").row_height = height
 
 
         # Step 4: Apply bold formatting only where needed

@@ -24,6 +24,7 @@ from converters.field_device_testing import FieldDeviceTestingConverter
 from converters.hoses_only import HosesOnlyConverter
 from converters.booster import BoosterConverter
 from converters.extra_annunciators import ExtraAnnunciatorConverter
+from converters.extra_battery_box import ExtraBatteryBoxConverter
 from converters.base import DefaultConverter
 
 
@@ -52,9 +53,13 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+
+user_profile = os.environ.get("USERPROFILE")
+
 # Path to your template file.
 TEMPLATE_FILENAME = "Annual ULC Template - CAN,ULC-S536-19 v8.xlsx"
-TEMPLATE_PATH = resource_path(os.path.join("report_templates", TEMPLATE_FILENAME))
+template_subfolder = r"Cantec Fire Alarms\Cantec Office - Documents\Cantec\Operations\Templates\Report Templates\Log Templates"
+TEMPLATE_PATH = os.path.join(user_profile, template_subfolder, TEMPLATE_FILENAME)
 
 # Dispatcher: mapping input sheet names to converter classes.
 CONVERTER_MAPPING = {
@@ -80,10 +85,10 @@ def detect_expected_sheets(input_filepath):
             if name in EXPECTED_SHEETS:
                 found.append(name)
             elif "booster" in name.lower():
-                print(f"Detected booster sheet: {name}")
                 found.append(name)
             elif "annunciators" in name.lower():
-                print(f"Detected annunciator sheet: {name}")
+                found.append(name)
+            elif "battery box" in name.lower():
                 found.append(name)
 
         wb.close()
@@ -127,12 +132,15 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
     try:
         # Create a temporary copy of the template to work with
         temp_template_filename = f"temp_template_{uuid.uuid4().hex}.xlsx"
+        if not user_profile:
+            raise EnvironmentError("USERPROFILE path not found. This script must run on a Windows system with a valid user profile.")
+        if not os.path.exists(TEMPLATE_PATH):
+            raise FileNotFoundError(f"Template file not found at:\n{TEMPLATE_PATH}")
         temp_template_path = os.path.join(os.getcwd(), temp_template_filename)
         shutil.copy(TEMPLATE_PATH, temp_template_path)
 
         # Launch Excel
         app = xw.App(visible=False)
-        print(f"xwings has opened")
         time.sleep(0.5)
         app.api.ScreenUpdating = False
         app.api.DisplayAlerts = False
@@ -142,38 +150,31 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
             sheet.name.strip(): sheet.name
             for sheet in input_wb.sheets
         }
-        print(f"{input_filepath} has been opened with xlwings")
         template_wb = xw.Book(temp_template_path, update_links=False)
-        print(f"{template_wb} has been opened with xlwings")
 
         # Process each confirmed sheet
         total = len(sheets_to_convert)
 
         booster_count = 1
-        print("Booster line passed")
-        print(f"num sheets to convert: {total}")
-        print(sheets_to_convert)
         for idx, sheet_name in enumerate(sheets_to_convert, start=1):
             actual_sheet_name = sheet_name_map.get(sheet_name.strip())
             if actual_sheet_name is None:
-                print(f"Sheet '{sheet_name}' not found in workbook.")
                 continue  # or raise
 
             input_sheet = input_wb.sheets[actual_sheet_name]
-            print(f"opening input sheet: {input_sheet.name}")
 
             if "booster" in sheet_name.lower():
                 converter = BoosterConverter(input_sheet, template_wb, booster_count)
                 booster_count += 1
             elif "annunciators" in sheet_name.lower():
                 converter = ExtraAnnunciatorConverter(input_sheet, template_wb)
+            elif "battery box" in sheet_name.lower():
+                converter = ExtraBatteryBoxConverter(input_sheet, template_wb)
             else:
                 converter_class = CONVERTER_MAPPING.get(sheet_name.strip(), DefaultConverter)
-                print(f"using converter class {converter_class}")
                 converter = converter_class(input_sheet, template_wb)
 
             converter.convert()
-            print(f"{sheet_name} converted")
 
             if progress_callback:
                 progress_callback(sheet_name, idx, total)
@@ -202,35 +203,107 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
         time.sleep(0.5)
 
         try:
-            print("saving template_output")
             template_wb.save()
         except Exception as save_error:
             messagebox.showerror("Save Error", f"Failed to save template:\n{save_error}")
             raise
 
-        time.sleep(1)
-    
-        
-        # === Step 2: Close workbooks ===
-        input_wb.close()
         template_wb.close()
-        app.quit()
-
         time.sleep(1)
 
         try:
             if os.path.exists(output_filepath):
                 os.remove(output_filepath)
             shutil.move(temp_template_path, output_filepath)
-            print(f"Moved to final location: {output_filepath}")
         except Exception as move_error:
             messagebox.showerror("Move Error", f"Failed to move saved file:\n{move_error}")
             raise
+                    
+                # === Step 2: Detect and export sprinkler-only report if applicable ===
+        sprinkler_sheets = {
+            "SPR Coverpage": None,  # always include *if* another sheet has data
+            "SPR Inspection Report Summary": ["D28:D41", "B74:J79", "B101:L104"],
+            "NFPA 25 Annual Checklist": ["A10:A25"],
+            "NFPA 25 Quart & Semi Checklist": ["A10", "A26"],
+            "Sprinkler Device List": ["B14:S56"],
+            "Low Point Record-if blank noPDF": ["B13:E18"],
+            "Gauges Record-if blank noPDF": ["B10:D14"],
+            "Fire Hydrant Form": ["C11"],
+        }
 
+        sprinkler_sheets_to_copy = []
+        non_cover_sheets_with_data = []
+
+        for sheet_name, ranges in sprinkler_sheets.items():
+            try:
+                sheet = input_wb.sheets[sheet_name]
+            except Exception:
+                continue  # Sheet doesn't exist
+
+            if ranges is None:
+                continue  # We'll only add SPR Coverpage later if needed
+
+            for rng in ranges:
+                cell_values = sheet.range(rng).value
+                if isinstance(cell_values, list):
+                    flat = [item for row in cell_values for item in (row if isinstance(row, list) else [row])]
+                    if any(val not in (None, "", 0) for val in flat):
+                        sprinkler_sheets_to_copy.append(sheet_name)
+                        non_cover_sheets_with_data.append(sheet_name)
+                        break
+                else:
+                    if cell_values not in (None, "", 0):
+                        sprinkler_sheets_to_copy.append(sheet_name)
+                        non_cover_sheets_with_data.append(sheet_name)
+                        break
+
+        # Only include cover page if there is real content elsewhere
+        if non_cover_sheets_with_data and "SPR Coverpage" in sheet_name_map:
+            try:
+                input_wb.sheets[sheet_name_map["SPR Coverpage"]]
+                sprinkler_sheets_to_copy.insert(0, "SPR Coverpage")
+            except Exception:
+                pass
+
+        if non_cover_sheets_with_data:
+            sprinkler_filename = f"{input_name} - Sprinkler Only.xlsx"
+            sprinkler_filepath = os.path.join(input_dir, sprinkler_filename)
+
+            sprinkler_wb = xw.Book()
+            dummy_sheet = sprinkler_wb.sheets[0]
+
+            for sheet_name in reversed(sprinkler_sheets_to_copy):  # Maintain original order
+                sheet = input_wb.sheets[sheet_name]
+                sheet.api.Copy(Before=sprinkler_wb.api.Sheets(1))
+
+            dummy_sheet.delete()
+            sprinkler_wb.save(sprinkler_filepath)
+            sprinkler_wb.close()
+
+
+        time.sleep(0.5)
+    
         
+        # === Step 3: Close workbooks ===
+        input_wb.close()
+       
+        app.quit()
+
+        # Clean up leftover temp template if it still exists
+        if os.path.exists(temp_template_path):
+            try:
+                os.remove(temp_template_path)
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not delete temp file: {temp_template_path} – {cleanup_error}")
+
         return output_filepath
 
     except Exception as e:
+        if os.path.exists(temp_template_path):
+            try:
+                os.remove(temp_template_path)
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not delete temp file after failure: {temp_template_path} – {cleanup_error}")
         messagebox.showerror("Conversion Error", f"An error occurred:\n{e}")
         return None
 
@@ -261,7 +334,6 @@ def select_file_and_convert():
         if not confirmed_sheets:
             messagebox.showinfo("Info", "No sheets selected for conversion.")
             return
-        print("Confirmed sheets:", confirmed_sheets)
         output_file = convert_report(
             filepath,
             confirmed_sheets,

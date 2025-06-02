@@ -32,7 +32,10 @@ class BoosterConverter(BaseSheetConverter):
         self.booster_count = booster_count
 
     def convert(self):
-        print(f"Converting {self.input_sheet.name} with booster count = {self.booster_count}")
+        # Check for meaningful data
+        location = self.get_from_input_cell("E5")
+        if not location:
+            return
 
         rel_start_row = self.start_row_of_22_1_section[self.booster_count]
         # region 22.1 CU or Transp Insp

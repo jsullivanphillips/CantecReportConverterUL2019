@@ -8,7 +8,6 @@ put_to_output_cell(self, sheet_index_or_name, cell, value):
 """
 class ULCC2Converter(BaseSheetConverter):
     def convert(self):
-        print("ULC CONVERTER RUNNING")
         # region 22 | CU or Transp Insp
         # CU or Transponder Location
         self.put_to_output_cell("22.1 | CU or Transp Insp", "H15", self.get_from_input_cell("E5"))
@@ -50,7 +49,6 @@ class ULCC2Converter(BaseSheetConverter):
         # region 22.2 | CU or Transp Test
         # Power 'ON' visual indicator operates.
         self.transfer_checkbox_rating('A7', "22.2 | CU or Transp Test", 9, col_yes='L', col_no='N', col_na='P')
-        print(f"ULC Power on is equal to {self.get_checkbox_value("A7")}, putton on output")
 
         # (8 - 15) : (11 - 18)
         for i, input_row in enumerate(range(8, 16), start=11):
@@ -184,10 +182,7 @@ class ULCC2Converter(BaseSheetConverter):
         raw_value = self.get_from_input_cell('E90')
         value = str(raw_value).strip() if raw_value is not None else ""
 
-        print(f"VALUE in E90 = [{value}]")
-
         if value.upper() == "NOT APPLICABLE" or value == "":
-            print("No sequential displays")
             self.put_to_output_cell("22.7 | Annun & Seq Disp", "J6", "True")
         else:
             sequential_display_location = self.get_from_input_cell('E90')
@@ -213,34 +208,34 @@ class ULCC2Converter(BaseSheetConverter):
         # endregion
 
 
-        # region 22.9 + 22.10 | Printer
+        # region 22.9 + 22.10 | Monitoring Etc.
         # Printer
         if str(self.get_from_input_cell('L127')).strip().upper() == "NOT APPLICABLE":
-            self.put_to_output_cell("22.9 + 22.10 | Printer", "J6", "True")
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", "J6", "True")
         else:
-            self.put_to_output_cell("22.9 + 22.10 | Printer", "D8", self.get_from_input_cell('L127'))
-            self.transfer_checkbox_rating("H129", "22.9 + 22.10 | Printer", 10, col_yes='L', col_no='N', col_na='P')
-            self.transfer_checkbox_rating("H132", "22.9 + 22.10 | Printer", 11, col_yes='L', col_no='N', col_na='P')
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", "D8", self.get_from_input_cell('L127'))
+            self.transfer_checkbox_rating("H129", "22.9 + 22.10 | Monitoring Etc.", 10, col_yes='L', col_no='N', col_na='P')
+            self.transfer_checkbox_rating("H132", "22.9 + 22.10 | Monitoring Etc.", 11, col_yes='L', col_no='N', col_na='P')
         
         # Ancillary Device Circuit
         for i, input_row in enumerate(range(91, 97), start=19):
-            self.put_to_output_cell("22.9 + 22.10 | Printer", f"A{i}", self.get_from_input_cell(f"H{input_row}"))
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", f"A{i}", self.get_from_input_cell(f"H{input_row}"))
             if self.is_yes(f"L{input_row}"):
-                self.put_to_output_cell("22.9 + 22.10 | Printer", f"J{i}", "True")
+                self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", f"J{i}", "True")
             elif self.is_no(f"N{input_row}"):
-                self.put_to_output_cell("22.9 + 22.10 | Printer", f"L{i}", "True")
+                self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", f"L{i}", "True")
         
         # Monitoring / Interconnection
         if str(self.get_from_input_cell('K83')).strip() == "" or self.get_from_input_cell('K83') == None:
-            self.put_to_output_cell("22.9 + 22.10 | Printer", "L34", "True")
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", "L34", "True")
         else:
-            self.transfer_checkbox_rating("H65", "22.9 + 22.10 | Printer", 36, col_yes='O', col_no='R', col_na='R')
-            self.transfer_checkbox_rating("H72", "22.9 + 22.10 | Printer", 37, col_yes='O', col_no='R', col_na='S')
-            self.transfer_checkbox_rating("H74", "22.9 + 22.10 | Printer", 39, col_yes='O', col_no='R', col_na='S')
-            self.transfer_checkbox_rating("H76", "22.9 + 22.10 | Printer", 38, col_yes='N', col_no='P', col_na='R')
-            self.transfer_checkbox_rating("H78", "22.9 + 22.10 | Printer", 44, col_yes='O', col_no='R', col_na='S')
+            self.transfer_checkbox_rating("H65", "22.9 + 22.10 | Monitoring Etc.", 36, col_yes='O', col_no='R', col_na='R')
+            self.transfer_checkbox_rating("H72", "22.9 + 22.10 | Monitoring Etc.", 37, col_yes='O', col_no='R', col_na='S')
+            self.transfer_checkbox_rating("H74", "22.9 + 22.10 | Monitoring Etc.", 39, col_yes='O', col_no='R', col_na='S')
+            self.transfer_checkbox_rating("H76", "22.9 + 22.10 | Monitoring Etc.", 38, col_yes='N', col_no='P', col_na='R')
+            self.transfer_checkbox_rating("H78", "22.9 + 22.10 | Monitoring Etc.", 44, col_yes='O', col_no='R', col_na='S')
             receiving_centre_name = self.get_from_input_cell('K83')
-            self.put_to_output_cell("22.9 + 22.10 | Printer", "O42", receiving_centre_name)
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", "O42", receiving_centre_name)
             receiving_centre_number = self.get_from_input_cell('M83')
-            self.put_to_output_cell("22.9 + 22.10 | Printer", "O43", receiving_centre_number)
+            self.put_to_output_cell("22.9 + 22.10 | Monitoring Etc.", "O43", receiving_centre_number)
         # endregion

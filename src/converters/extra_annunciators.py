@@ -11,7 +11,6 @@ class ExtraAnnunciatorConverter(BaseSheetConverter):
     ]
 
     def convert(self):
-        print("Converting extra annunciators")
         num_extra_annuns = 0
 
         # region Extra Annun 1

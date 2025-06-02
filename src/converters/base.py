@@ -73,7 +73,6 @@ class BaseSheetConverter:
             row_to_insert = row_to_clone + 1
 
             if row_to_clone < 1:
-                print(f"{log_prefix}[WARNING] Invalid row_to_clone: {row_to_clone}")
                 return
 
             # Step 0: Unprotect the sheet if needed
@@ -83,7 +82,6 @@ class BaseSheetConverter:
                         output_sheet.api.Unprotect(Password=password)
                     else:
                         output_sheet.api.Unprotect()
-                    print(f"{log_prefix}[INFO] Sheet unprotected.")
                 except Exception as e:
                     print(f"{log_prefix}[ERROR] Could not unprotect sheet: {e}")
                     return
@@ -150,7 +148,6 @@ class BaseSheetConverter:
                 print(f"{log_prefix}[WARNING] Could not copy row height: {e}")
         
 
-            print(f"{log_prefix}[INFO] Inserted formatted row at {row_to_insert} (cloned from row {row_to_clone})")
 
         except Exception as final_error:
             print(f"{log_prefix}[FATAL] insert_formatted_row_below failed: {final_error}")
@@ -196,14 +193,12 @@ class BaseSheetConverter:
                         sheet.api.Unprotect(Password=password)
                     else:
                         sheet.api.Unprotect()
-                    print(f"[INFO] Sheet '{sheet.name}' unprotected for wrap change.")
                 except Exception as e:
                     raise PermissionError(f"Could not unprotect sheet '{sheet.name}': {e}")
 
             # Apply wrap text setting
             try:
                 sheet[cell].api.WrapText = wrap
-                print(f"[INFO] Set WrapText={'True' if wrap else 'False'} on {cell} in sheet '{sheet.name}'")
             except Exception as e:
                 raise ValueError(f"Failed to set WrapText on cell '{cell}' in sheet '{sheet.name}': {e}")
 
@@ -287,7 +282,6 @@ class BaseSheetConverter:
             # Apply height to output sheet row
             try:
                 sheet.range(f"{output_row_number}:{output_row_number}").row_height = input_height
-                print(f"[INFO] Row height {input_height} copied from input row {input_row_number} to output row {output_row_number} on '{sheet.name}'")
             except Exception as e:
                 raise ValueError(f"Could not set row height on output row {output_row_number}: {e}")
 
@@ -315,7 +309,6 @@ class BaseSheetConverter:
 
             # Skip if value is None and suppression is on
             if value is None and suppress_none:
-                print(f"[INFO] Skipping write to {cell} on '{sheet.name}': value is None and suppress_none is True")
                 return
 
             # Attempt to unprotect the sheet
