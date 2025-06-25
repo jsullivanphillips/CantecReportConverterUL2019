@@ -96,7 +96,7 @@ def detect_expected_sheets(input_filepath):
         return found
 
     except Exception as e:
-        messagebox.showerror("Error", f"Error detecting sheets:\n{e}")
+        print("Error", f"Error detecting sheets:\n{e}")
         return []
 
 
@@ -142,8 +142,12 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
         # Launch Excel
         app = xw.App(visible=False)
         time.sleep(0.5)
-        app.api.ScreenUpdating = False
+        app.display_alerts = False
         app.api.DisplayAlerts = False
+        app.api.ScreenUpdating = False
+        app.api.AskToUpdateLinks = False
+        app.api.AlertBeforeOverwriting = False
+        app.api.AutomationSecurity = 3  # Disable macros and prompts
 
         input_wb = xw.Book(input_filepath, update_links=False)
         sheet_name_map = {
@@ -205,7 +209,7 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
         try:
             template_wb.save()
         except Exception as save_error:
-            messagebox.showerror("Save Error", f"Failed to save template:\n{save_error}")
+            print("Save Error", f"Failed to save template:\n{save_error}")
             raise
 
         template_wb.close()
@@ -216,7 +220,7 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
                 os.remove(output_filepath)
             shutil.move(temp_template_path, output_filepath)
         except Exception as move_error:
-            messagebox.showerror("Move Error", f"Failed to move saved file:\n{move_error}")
+            print("Move Error", f"Failed to move saved file:\n{move_error}")
             raise
                     
                 # === Step 2: Detect and export sprinkler-only report if applicable ===
@@ -304,7 +308,7 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
                 os.remove(temp_template_path)
             except Exception as cleanup_error:
                 print(f"⚠️ Could not delete temp file after failure: {temp_template_path} – {cleanup_error}")
-        messagebox.showerror("Conversion Error", f"An error occurred:\n{e}")
+        print("Conversion Error", f"An error occurred:\n{e}")
         return None
 
 def update_progress(sheet_name, idx, total):
@@ -328,7 +332,7 @@ def select_file_and_convert():
     if filepath:
         found_sheets = detect_expected_sheets(filepath)
         if not found_sheets:
-            messagebox.showerror("Error", "No expected sheets found in the selected file.")
+            print("Error", "No expected sheets found in the selected file.")
             return
         confirmed_sheets = confirm_sheets_dialog(found_sheets, root)
         if not confirmed_sheets:
@@ -359,7 +363,7 @@ def handle_drop(event):
         found_sheets = detect_expected_sheets(filepath)
         if not found_sheets:
             drop_zone.config(bg="#fff3cd", fg="#856404", text="⚠️ No expected sheets found")
-            messagebox.showerror("Error", "No expected sheets found in the selected file.")
+            print("Error", "No expected sheets found in the selected file.")
             convert_button.config(state="normal")  # 👈 Re-enable on error
             return
 
