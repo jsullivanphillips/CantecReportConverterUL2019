@@ -68,6 +68,7 @@ CONVERTER_MAPPING = {
     "LOG REPORT C3.2- Device Record": LogReportConverter,
     "EXT only": ExtOnlyConverter,
     "ELU only": EluOnlyConverter,
+    "EMERGENCY LIGHTING": EluOnlyConverter,
     "HOSES only": HosesOnlyConverter,
     "ULC - C2.1-2.12": ULCC2Converter,
     "C3.1FieldDeviceTesting-Legend": FieldDeviceTestingConverter,
@@ -89,6 +90,8 @@ def detect_expected_sheets(input_filepath):
             elif "annunciators" in name.lower():
                 found.append(name)
             elif "battery box" in name.lower():
+                found.append(name)
+            elif "emergency lighting" in name.lower():
                 found.append(name)
 
         wb.close()
@@ -223,7 +226,7 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
             print("Move Error", f"Failed to move saved file:\n{move_error}")
             raise
                     
-                # === Step 2: Detect and export sprinkler-only report if applicable ===
+        # === Step 2: Detect and export sprinkler-only report if applicable ===
         sprinkler_sheets = {
             "SPR Coverpage": None,  # always include *if* another sheet has data
             "SPR Inspection Report Summary": ["D28:D41", "B74:J79", "B101:L104"],
@@ -235,14 +238,18 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
             "Fire Hydrant Form": ["C11"],
         }
 
+        # Build a map of stripped sheet names to their actual names in the workbook
+        sheet_name_map = {sheet.name.strip(): sheet.name for sheet in input_wb.sheets}
+
         sprinkler_sheets_to_copy = []
         non_cover_sheets_with_data = []
 
-        for sheet_name, ranges in sprinkler_sheets.items():
-            try:
-                sheet = input_wb.sheets[sheet_name]
-            except Exception:
-                continue  # Sheet doesn't exist
+        for expected_name, ranges in sprinkler_sheets.items():
+            actual_name = sheet_name_map.get(expected_name)
+            if not actual_name:
+                continue  # Sheet not found in workbook
+
+            sheet = input_wb.sheets[actual_name]
 
             if ranges is None:
                 continue  # We'll only add SPR Coverpage later if needed
@@ -252,24 +259,27 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
                 if isinstance(cell_values, list):
                     flat = [item for row in cell_values for item in (row if isinstance(row, list) else [row])]
                     if any(val not in (None, "", 0) for val in flat):
-                        sprinkler_sheets_to_copy.append(sheet_name)
-                        non_cover_sheets_with_data.append(sheet_name)
+                        print(f"sprinkler sheet found: {actual_name}")
+                        sprinkler_sheets_to_copy.append(actual_name)
+                        non_cover_sheets_with_data.append(actual_name)
                         break
                 else:
                     if cell_values not in (None, "", 0):
-                        sprinkler_sheets_to_copy.append(sheet_name)
-                        non_cover_sheets_with_data.append(sheet_name)
+                        print(f"sprinkler sheet found: {actual_name}")
+                        sprinkler_sheets_to_copy.append(actual_name)
+                        non_cover_sheets_with_data.append(actual_name)
                         break
 
         # Only include cover page if there is real content elsewhere
-        if non_cover_sheets_with_data and "SPR Coverpage" in sheet_name_map:
-            try:
-                input_wb.sheets[sheet_name_map["SPR Coverpage"]]
-                sprinkler_sheets_to_copy.insert(0, "SPR Coverpage")
-            except Exception:
-                pass
-
         if non_cover_sheets_with_data:
+            cover_actual = sheet_name_map.get("SPR Coverpage")
+            if cover_actual:
+                try:
+                    input_wb.sheets[cover_actual]  # Confirm exists
+                    sprinkler_sheets_to_copy.insert(0, cover_actual)
+                except Exception:
+                    pass
+
             sprinkler_filename = f"{input_name} - Sprinkler Only.xlsx"
             sprinkler_filepath = os.path.join(input_dir, sprinkler_filename)
 
@@ -284,8 +294,8 @@ def convert_report(input_filepath, sheets_to_convert, progress_callback=None, sa
             sprinkler_wb.save(sprinkler_filepath)
             sprinkler_wb.close()
 
-
         time.sleep(0.5)
+
     
         
         # === Step 3: Close workbooks ===

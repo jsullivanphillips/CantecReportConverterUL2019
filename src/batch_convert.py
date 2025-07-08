@@ -17,6 +17,7 @@ from main import detect_expected_sheets, convert_report
 BASE_DIR = Path(r"C:\Users\jamie\Cantec Fire Alarms\Cantec Office - Documents\Cantec\Location Data")
 DATE_PATTERN = re.compile(r"([A-Za-z]+) (\d{1,2})(?:-\d{1,2})?, (\d{4})")
 PROGRESS_LOG_PATH = BASE_DIR / "converted_folders.json"
+SPRINKLER_UPLOAD_LOG_PATH = BASE_DIR / "sprinkler_files_uploaded.json"
 FAILED_CONVERSIONS_LOG_PATH = BASE_DIR / "failed_conversions.json"
 FAILED_UPLOADS_LOG_PATH = BASE_DIR / "failed_uploads.json"
 
@@ -239,6 +240,22 @@ def find_most_recent_v7_file(folder: Path):
     dated_files.sort(reverse=True, key=lambda tup: (tup[0].year, tup[0].month, tup[0].day))
     return dated_files[0][1]
 
+def find_most_recent_v7_sprinkler_file(folder: Path):
+    v7_files = [
+        f for f in folder.glob("*.xlsx")
+        if "V7" in f.name.upper() and "sprinkler" in f.name.lower()
+    ]
+    dated_files = []
+    for file in v7_files:
+        file_date = parse_date_from_filename(file.name)
+        if file_date:
+            dated_files.append((file_date, file))
+    if not dated_files:
+        return None
+    dated_files.sort(reverse=True, key=lambda tup: (tup[0].year, tup[0].month, tup[0].day))
+    return dated_files[0][1]
+
+
 def get_deepest_folders_with_v7_files(base_dir: Path):
     for root, dirs, files in os.walk(base_dir):
         folder = Path(root)
@@ -246,8 +263,26 @@ def get_deepest_folders_with_v7_files(base_dir: Path):
         if v7_files:
             yield folder
 
+
+def get_deepest_folders_with_v7_sprinkler_files(base_dir: Path):
+    for root, _, files in os.walk(base_dir):
+        folder = Path(root)
+        v7_files = [f for f in files if "SPRINKLER" in f.upper() and f.endswith(".xlsx")]
+        if v7_files:
+            yield folder
+    
+
 def load_progress():
     if PROGRESS_LOG_PATH.exists():
+        try:
+            with open(PROGRESS_LOG_PATH, "r") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
+    return set()
+
+def load_sprinkler_upload_progress():
+    if SPRINKLER_UPLOAD_LOG_PATH.exists():
         try:
             with open(PROGRESS_LOG_PATH, "r") as f:
                 return set(json.load(f))
@@ -289,6 +324,52 @@ def save_progress(processed_folders):
     with open(PROGRESS_LOG_PATH, "w") as f:
         json.dump(sorted(processed_folders), f, indent=2)
 
+def save_sprinkler_upload_progress(processed_folders):
+    with open(SPRINKLER_UPLOAD_LOG_PATH, "w") as f:
+        json.dump(sorted(processed_folders), f, indent=2)
+
+
+def upload_sprinkler_reports():
+    failed_upload_log = load_failed_upload_log()
+    processed = load_sprinkler_upload_progress()
+
+    global GLOBAL_LOCATION_CACHE, NORMALIZED_LOCATION_MAP
+    log("Fetching active ServiceTrade locations...")
+    GLOBAL_LOCATION_CACHE = fetch_active_locations_from_st()
+    # Build normalized map once
+    NORMALIZED_LOCATION_MAP = {
+        normalize_address(loc_data["address"]): loc_data
+        for loc_data in GLOBAL_LOCATION_CACHE.values()
+    }
+
+    log(f"🔎 Scanning for V7 Sprinkler Reports in {BASE_DIR}...")
+    target_folders = list(get_deepest_folders_with_v7_sprinkler_files(BASE_DIR))
+    if not target_folders:
+        log("❌ No folders with V7 Sprinkler files found.")
+        return
+
+    log(f"Found {len(processed)} folders already processed.\n")
+    log(f"Starting conversion of {len(target_folders)} folders...\n")
+
+    for folder in tqdm(target_folders, desc="Uploading", unit="folder"):
+        if str(folder) in processed:
+            log(f"{folder.name}: Already uploaded. Skipping.")
+            continue
+        processed.add(str(folder))
+        try:
+            file = find_most_recent_v7_sprinkler_file(folder)
+            if not file:
+                log(f"No V7 sprinkler file found in {folder.name}. Skipping.")
+                continue
+
+            log(f"📤 {file.name}: Uploading V7 Sprinkler to ServiceTrade...")
+            upload_to_service_trade(file, folder, failed_upload_log)
+            save_failed_upload_log(failed_upload_log)
+            save_sprinkler_upload_progress(processed)
+        except Exception as e:
+            print(f"failed to upload sprinkler report: {e}")
+
+
 def batch_convert_all_reports(overwrite_autoconverted: bool = False):
     failed_log = load_failed_log()
     processed = load_progress()
@@ -309,6 +390,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
     if not target_folders:
         log("❌ No folders with V7 files found.")
         return
+    
 
    
     log(f"Found {len(processed)} folders already processed.\n")
@@ -436,4 +518,8 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
 
 if __name__ == "__main__":
     overwrite_flag = "--overwrite" in sys.argv
-    batch_convert_all_reports(overwrite_autoconverted=overwrite_flag)
+    sprinkler_upload = "--sprinkler-upload" in sys.argv
+    if sprinkler_upload:
+        upload_sprinkler_reports()
+    else:
+        batch_convert_all_reports(overwrite_autoconverted=overwrite_flag)
