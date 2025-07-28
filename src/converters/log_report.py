@@ -89,7 +89,7 @@ class LogReportConverter(BaseSheetConverter):
         start_output_row = 14
         max_input_rows = len(input_data)
 
-        col_A, col_C, col_D, col_E, col_G, col_I, col_J, col_F, col_H, col_M, bold_mask = [], [], [], [], [], [], [], [], [], [], []
+        col_A, col_B, col_C, col_D, col_E, col_G, col_I, col_J, col_F, col_H, col_M, bold_mask = [], [], [], [], [], [], [], [], [], [], [], []
 
         number_of_consecutive_empty_rows = 0
         last_written_row = start_output_row - 1
@@ -117,6 +117,7 @@ class LogReportConverter(BaseSheetConverter):
             if skip_testing_data:
                 # Only retain location, device type, and remarks
                 col_A.append(device_location)
+                col_B.append(row_data[1])
                 col_C.append(row_data[2])
                 col_D.append("-")      
                 col_E.append("-")
@@ -154,10 +155,16 @@ class LogReportConverter(BaseSheetConverter):
 
                 if loop_str and device_str:
                     device_address_and_loop = f"Loop {loop_str}, {device_str}"
+                elif loop_str:
+                    device_address_and_loop = f"{loop_str}"
+                elif device_str:
+                    device_address_and_loop = f"{device_str}"
                 else:
                     device_address_and_loop = ""
+                
 
                 col_A.append(device_location)
+                col_B.append(row_data[1])
                 col_C.append(row_data[2])   # From D
                 col_D.append(row_data[13])  # From O
                 col_E.append(device_address_and_loop)
@@ -180,12 +187,13 @@ class LogReportConverter(BaseSheetConverter):
 
         # Step 3: Bulk write to output sheet
         output_sheet.range(f"A{start_output_row}:A{end_row}").value = [[v] for v in col_A]
-        output_sheet.range(f"C{start_output_row}:C{end_row}").value = [[v] for v in col_C]
-        output_sheet.range(f"E{start_output_row}:E{end_row}").value = [[v] for v in col_E]
-        output_sheet.range(f"F{start_output_row}:F{end_row}").value = [[v] for v in col_F]
-        output_sheet.range(f"H{start_output_row}:H{end_row}").value = [[v] for v in col_H]
-        output_sheet.range(f"D{start_output_row}:D{end_row}").value = [[v] for v in col_D]
-        output_sheet.range(f"M{start_output_row}:M{end_row}").value = [[v] for v in col_M]
+        output_sheet.range(f"B{start_output_row}:B{end_row}").value = [[v] for v in col_B]
+        output_sheet.range(f"D{start_output_row}:D{end_row}").value = [[v] for v in col_C]
+        output_sheet.range(f"F{start_output_row}:F{end_row}").value = [[v] for v in col_E]
+        output_sheet.range(f"G{start_output_row}:G{end_row}").value = [[v] for v in col_F]
+        output_sheet.range(f"I{start_output_row}:I{end_row}").value = [[v] for v in col_H]
+        output_sheet.range(f"E{start_output_row}:E{end_row}").value = [[v] for v in col_D]
+        output_sheet.range(f"N{start_output_row}:N{end_row}").value = [[v] for v in col_M]
         
         for i, (op_confirmed, ann_confirmed, install_corr) in enumerate(zip(col_I, col_J, col_G)):
             row = start_output_row + i
@@ -228,7 +236,7 @@ class LogReportConverter(BaseSheetConverter):
                 output_sheet.range(f"A{row}").font.bold = True
 
         # Step 5: Set print area
-        print_range = f"A1:M{last_written_row + 5}"
+        print_range = f"A1:N{last_written_row + 5}"
         output_sheet.api.PageSetup.PrintArea = f"${print_range.replace(':', ':$')}"
 
         # endregion

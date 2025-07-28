@@ -9,7 +9,9 @@ class BoosterConverter(BaseSheetConverter):
         90,
         135,
         180,
-        228
+        225,
+        274,
+        321
     ]
 
     start_row_of_22_2_section = [
@@ -17,13 +19,21 @@ class BoosterConverter(BaseSheetConverter):
         40,
         79,
         118,
+        157,
+        196,
+        235,
+        274
     ]
 
     start_row_of_22_5_section = [
         1,
         46,
         91,
-        136
+        136,
+        181,
+        227,
+        273,
+        319
     ]
 
     def __init__(self, input_sheet, output_wb, booster_count):

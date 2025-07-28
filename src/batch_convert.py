@@ -50,16 +50,63 @@ def upload_to_service_trade(file_path: Path, folder: Path, failed_upload_log):
             failed_upload_log.add(f"[No Building Asset]: {address_guess}")
             return
         
-        success = upload_file_to_servicetrade(file_path, asset_id)
-        if not success:
-            log(f"⚠️ Upload failed for {file_path.name}")
-            failed_upload_log.add(f"[Upload Failed]: {address_guess}")
+        should_upload = delete_auto_uploaded_attachments_on_asset(asset_id=asset_id)
+        if should_upload:
+            success = upload_file_to_servicetrade(file_path, asset_id)
+            if not success:
+                log(f"Upload failed for {file_path.name}")
+                failed_upload_log.add(f"[Upload Failed]: {address_guess}")
+            else:
+                log(f"Upload for {file_path.name} complete.")
+        else:
+            log("Manually uploaded file exists. Not uploading.")
 
 
     except Exception as e:
         log(f"Upload failed for {file_path.name}: {e}")
         failed_upload_log.add(f"[Upload Failed with Exception {e}]: {address_guess}")
     log("\n")
+
+
+def delete_auto_uploaded_attachments_on_asset(asset_id: int):
+    endpoint = "https://api.servicetrade.com/api/attachment"
+    purpose_id = 7  # "Generic Attachment"
+    entity_type = 2  # 2 = Asset
+    entity_id = asset_id
+
+    params = {
+        "entityId": (None, str(entity_id)),
+        "entityType": (None, str(entity_type)),
+        "purposeId": (None, str(purpose_id)),
+    }
+    try:
+        response = self_session.get(endpoint, params=params)
+        response.raise_for_status()
+    except Exception as e:
+        log(f"Exception while retrieving attachments: {e}")
+    
+    json_data = response.json().get("data")
+    attachments = json_data.get("attachments")
+    
+    if len(attachments) == 0:
+        log("No attachments on asset. Upload file.")
+        return True
+
+    for a in attachments:
+        if "Auto-uploaded" in a.get("description"):
+            a_id = a.get("id")
+            try:
+                response = self_session.delete(endpoint + f"/{a_id}")
+                response.raise_for_status()
+                log("deleted Auto-uploaded attachment")
+                return True
+            except Exception as e:
+                log(f"Exception while deleting attachment: {e}")
+
+    log("Manually uploaded file on asset. Do not upload.")
+    return False
+    
+
     
 
 def upload_file_to_servicetrade(file_path: Path, asset_id: int, description: str = ""):
@@ -82,7 +129,7 @@ def upload_file_to_servicetrade(file_path: Path, asset_id: int, description: str
             files = {
                 "purposeId": (None, str(purpose_id)),
                 "entityType": (None, str(entity_type)),
-                "entityId": (None, str(entity_id)),
+                "entityId": (None, entity_id),
                 "description": (None, description or f"Auto-uploaded report: {file_path.name}"),
                 "uploadedFile": (file_path.name, f, mime_type),
             }
@@ -92,11 +139,11 @@ def upload_file_to_servicetrade(file_path: Path, asset_id: int, description: str
 
             json_data = response.json()
             uri = json_data.get("data", {}).get("uri")
-            log(f"📎 Upload complete: {file_path.name} → {uri}")
+            log(f"Upload complete: {file_path.name} → {uri}")
             return True
 
     except Exception as e:
-        log(f"❌ Failed to upload {file_path.name} – {e}")
+        log(f"Failed to upload {file_path.name} – {e}")
         return False
 
 
@@ -117,7 +164,7 @@ def extract_address_from_filename(filename: str) -> str:
         parts = name_without_ext.split(",")
         return parts[0].strip() if parts else name_without_ext
     except Exception as e:
-        log(f"⚠️ Failed to extract address from filename '{filename}': {e}")
+        log(f"Failed to extract address from filename '{filename}': {e}")
         return filename
 
 def normalize_address(text: str) -> str:
@@ -126,11 +173,7 @@ def normalize_address(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)  # collapse whitespace
     return text.strip()
 
-def fetch_active_locations_from_st():
-    """
-    Fetch active locations from ServiceTrade API.
-    Return a dictionary of location_id -> { address, name, full_text, asset_id, asset_name }
-    """
+def authenticate():
     # Authenticate
     auth_url = "https://api.servicetrade.com/api/auth"
     payload = {"username": "jsullivan-phillips", "password": "Cetnac123!"}
@@ -138,8 +181,15 @@ def fetch_active_locations_from_st():
         auth_response = self_session.post(auth_url, json=payload)
         auth_response.raise_for_status()
     except Exception as e:
-        log(f"❌ Authentication failed: {e}")
+        log(f"Authentication failed: {e}")
         return {}
+
+def fetch_active_locations_from_st():
+    """
+    Fetch active locations from ServiceTrade API.
+    Return a dictionary of location_id -> { address, name, full_text, asset_id, asset_name }
+    """
+    authenticate()
 
     # Grab total page count
     location_endpoint = "https://api.servicetrade.com/api/location"
@@ -147,7 +197,7 @@ def fetch_active_locations_from_st():
         initial_response = self_session.get(location_endpoint, params={"status": "active", "limit": 200, "page": 1})
         initial_response.raise_for_status()
     except Exception as e:
-        log(f"❌ Initial location retrieval failed: {e}")
+        log(f"Initial location retrieval failed: {e}")
         return {}
 
     total_pages = initial_response.json().get("data", {}).get("totalPages", 1)
@@ -159,7 +209,7 @@ def fetch_active_locations_from_st():
             resp.raise_for_status()
             return resp.json().get("data", {}).get("locations", [])
         except Exception as e:
-            log(f"❌ Failed to fetch page {page_num}: {e}")
+            log(f"Failed to fetch page {page_num}: {e}")
             return []
 
     all_locations = []
@@ -199,7 +249,7 @@ def fetch_active_locations_from_st():
                     })
                     break
         except Exception as e:
-            log(f"❌ Asset fetch failed for location {loc_id} ({address}): {e}")
+            log(f"Asset fetch failed for location {loc_id} ({address}): {e}")
 
         return loc_id, result
 
@@ -209,7 +259,7 @@ def fetch_active_locations_from_st():
             loc_id, data = f.result()
             active_locations[loc_id] = data
 
-    log(f"✅ Retrieved {len(active_locations)} active locations with assets.")
+    log(f"Retrieved {len(active_locations)} active locations with assets.")
     return active_locations
 
 # endregion
@@ -342,10 +392,10 @@ def upload_sprinkler_reports():
         for loc_data in GLOBAL_LOCATION_CACHE.values()
     }
 
-    log(f"🔎 Scanning for V7 Sprinkler Reports in {BASE_DIR}...")
+    log(f"Scanning for V7 Sprinkler Reports in {BASE_DIR}...")
     target_folders = list(get_deepest_folders_with_v7_sprinkler_files(BASE_DIR))
     if not target_folders:
-        log("❌ No folders with V7 Sprinkler files found.")
+        log("No folders with V7 Sprinkler files found.")
         return
 
     log(f"Found {len(processed)} folders already processed.\n")
@@ -362,7 +412,7 @@ def upload_sprinkler_reports():
                 log(f"No V7 sprinkler file found in {folder.name}. Skipping.")
                 continue
 
-            log(f"📤 {file.name}: Uploading V7 Sprinkler to ServiceTrade...")
+            log(f"{file.name}: Uploading V7 Sprinkler to ServiceTrade...")
             upload_to_service_trade(file, folder, failed_upload_log)
             save_failed_upload_log(failed_upload_log)
             save_sprinkler_upload_progress(processed)
@@ -377,7 +427,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
     print("✅ Preview of processed entries:", list(processed)[:5])
 
     global GLOBAL_LOCATION_CACHE, NORMALIZED_LOCATION_MAP
-    log("📡 Fetching active ServiceTrade locations...")
+    log("Fetching active ServiceTrade locations...")
     GLOBAL_LOCATION_CACHE = fetch_active_locations_from_st()
     # Build normalized map once
     NORMALIZED_LOCATION_MAP = {
@@ -388,7 +438,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
     log(f"🔎 Scanning for V7 folders in {BASE_DIR}...")
     target_folders = list(get_deepest_folders_with_v7_files(BASE_DIR))
     if not target_folders:
-        log("❌ No folders with V7 files found.")
+        log("No folders with V7 files found.")
         return
     
 
@@ -404,7 +454,6 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
         try:
             file = find_most_recent_v7_file(folder)
             if not file:
-                log(f"⚠️ {folder.name}: No valid V7 file with date found. Skipping.")
                 processed.add(str(folder))
                 save_progress(processed)
                 continue
@@ -414,7 +463,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
                 autoconverted_path = file.with_name(autoconverted_name)
 
                 if autoconverted_path.exists() and not overwrite_autoconverted:
-                    log(f"🟡 {file.name}: Already converted. Skipping.")
+                    log(f"{file.name}: Already converted. Skipping.")
                 else:
                     v8_name = re.sub(r"(?i)V7", "V8", original_name)
                     v8_path = file.with_name(v8_name)
@@ -424,7 +473,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
                         found_sheets = detect_expected_sheets(str(file))
 
                         if not found_sheets:
-                            log(f"⚠️ {file.name}: No expected sheets found. Skipping.")
+                            log(f"{file.name}: No expected sheets found. Skipping.")
                         else:
                             # ❗ Check for ULC+C2.1 sheets
                             ulc_c2_sheets = [
@@ -446,7 +495,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
                             # ❗ Check for multiple "LOG REPORT" sheets
                             log_sheets = [s for s in found_sheets if "LOG REPORT" in s.upper()]
                             if len(log_sheets) > 1:
-                                log(f"🔶 {file.name}: Multiple LOG REPORT sheets found ({log_sheets}). Skipping.")
+                                log(f"{file.name}: Multiple LOG REPORT sheets found ({log_sheets}). Skipping.")
                                 failed_log.add(str(file))
                                 if autoconverted_path.exists():
                                     try:
@@ -467,7 +516,7 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
                                         except Exception as cleanup_error:
                                             log(f"{file.name}: Failed to delete {f.name} – {cleanup_error}")
                             else:
-                                log(f"📄 {file.name}: Converting {file.name}")
+                                log(f"{file.name}: Converting {file.name}")
                                 output_file = convert_report(
                                     input_filepath=str(file),
                                     sheets_to_convert=found_sheets,
@@ -502,12 +551,12 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
 
         except Exception as e:
             name = file.name if file else folder.name
-            log(f"🔥 {name}: Unexpected error – {e}")
+            log(f"{name}: Unexpected error – {e}")
             failed_log.add(f"[FAILED CONVERSION] {str(folder)}")
         
         finally:
             if not v8_uploaded and file and file.exists():
-                log(f"📤 {file.name}: Uploading fallback original V7 to ServiceTrade...")
+                log(f"{file.name}: Uploading fallback original V7 to ServiceTrade...")
                 upload_to_service_trade(file, folder, failed_upload_log)
                 save_failed_upload_log(failed_upload_log)
 
@@ -515,11 +564,17 @@ def batch_convert_all_reports(overwrite_autoconverted: bool = False):
         save_progress(processed)
         save_failed_log(failed_log)
         save_failed_upload_log(failed_upload_log)
+        log(f"\n==========\n")
 
 if __name__ == "__main__":
     overwrite_flag = "--overwrite" in sys.argv
     sprinkler_upload = "--sprinkler-upload" in sys.argv
+    test = "--test" in sys.argv
     if sprinkler_upload:
         upload_sprinkler_reports()
+    elif test:
+        authenticate()
+        delete_auto_uploaded_attachments_on_asset(24388988)
     else:
         batch_convert_all_reports(overwrite_autoconverted=overwrite_flag)
+    
